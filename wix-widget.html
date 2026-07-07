@@ -1,0 +1,167 @@
+<!--
+EPM Wix Frontend Widget
+
+Replace:
+https://YOUR-BACKEND-URL.com/api/estimate
+
+with your hosted backend endpoint after deploying the backend.
+-->
+
+<div id="epm-ai-widget">
+  <div class="epm-box">
+    <h2>EPM Smart Property Estimate</h2>
+    <p>Enter your address, select services, and EPM will generate a working estimate.</p>
+
+    <input id="epmAddress" placeholder="Enter property address" />
+
+    <div class="services">
+      <label><input type="checkbox" value="lawn"> Lawn Care</label>
+      <label><input type="checkbox" value="surface"> Surface Cleaning</label>
+      <label><input type="checkbox" value="houseWindow"> House & Window Wash</label>
+      <label><input type="checkbox" value="fence"> Fence Washing</label>
+      <label><input type="checkbox" value="gutters"> Gutter Cleaning</label>
+      <label><input type="checkbox" value="roof"> Roof Cleaning</label>
+    </div>
+
+    <button onclick="getEpmEstimate()">Generate Estimate</button>
+
+    <div id="epmResult"></div>
+  </div>
+</div>
+
+<style>
+#epm-ai-widget {
+  font-family: Arial, sans-serif;
+  max-width: 850px;
+  margin: auto;
+}
+.epm-box {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow: 0 12px 35px rgba(0,0,0,.12);
+  color: #061b33;
+}
+.epm-box h2 {
+  margin: 0 0 8px;
+  font-size: 30px;
+}
+.epm-box p {
+  color: #64748b;
+}
+#epmAddress {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-sizing: border-box;
+  margin: 12px 0;
+}
+.services label {
+  display: block;
+  padding: 8px 0;
+}
+button {
+  width: 100%;
+  padding: 15px;
+  background: #2f7d20;
+  color: white;
+  border: none;
+  border-radius: 9px;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 12px;
+  cursor: pointer;
+}
+#epmResult {
+  margin-top: 18px;
+}
+.metric, .line {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 0;
+}
+.total {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2f7d20;
+  margin-top: 12px;
+}
+</style>
+
+<script>
+const EPM_BACKEND_URL = "https://YOUR-BACKEND-URL.com/api/estimate";
+
+async function getEpmEstimate() {
+  const address = document.getElementById("epmAddress").value.trim();
+  const selected = Array.from(document.querySelectorAll(".services input:checked")).map(x => x.value);
+  const result = document.getElementById("epmResult");
+
+  if (!address) {
+    alert("Please enter an address.");
+    return;
+  }
+
+  if (selected.length === 0) {
+    alert("Please select at least one service.");
+    return;
+  }
+
+  result.innerHTML = "<p>Generating EPM estimate...</p>";
+
+  try {
+    const res = await fetch(EPM_BACKEND_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        address,
+        services: selected
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Estimate failed.");
+    }
+
+    const m = data.metrics;
+    const q = data.quote;
+
+    let html = `
+      <h3>EPM Home Profile</h3>
+      <div class="metric"><span>Property</span><strong>${data.property.formattedAddress}</strong></div>
+      <div class="metric"><span>Living Area</span><strong>${m.livingAreaSqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Lawn Area</span><strong>${m.lawnAreaSqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Driveway</span><strong>${m.drivewaySqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Walkway</span><strong>${m.walkwaySqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Entry / Porch</span><strong>${m.entryPorchSqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Sidewalk</span><strong>${m.sidewalkSqFt.toLocaleString()} sq ft</strong></div>
+      <div class="metric"><span>Fence</span><strong>${m.fenceLinearFt.toLocaleString()} linear ft</strong></div>
+      <div class="metric"><span>Roof</span><strong>${m.roofAreaSqFt.toLocaleString()} sq ft</strong></div>
+
+      <h3>Estimated Quote</h3>
+    `;
+
+    q.lineItems.forEach(item => {
+      html += `<div class="line"><span>${item.name}<br><small>${item.calculation}</small></span><strong>$${item.price.toLocaleString()}</strong></div>`;
+    });
+
+    html += `
+      <div class="line"><span>Subtotal</span><strong>$${q.subtotal.toLocaleString()}</strong></div>
+      <div class="line"><span>Bundle Discount</span><strong>${Math.round(q.discountRate * 100)}%</strong></div>
+      <div class="line"><span>You Save</span><strong>$${q.savings.toLocaleString()}</strong></div>
+      <div class="total">Estimated Total: $${q.total.toLocaleString()}</div>
+      <p><small>${data.disclaimer}</small></p>
+    `;
+
+    result.innerHTML = html;
+  } catch (err) {
+    result.innerHTML = `<p style="color:#b91c1c;">${err.message}</p>`;
+  }
+}
+</script>
