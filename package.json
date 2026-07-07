@@ -1,7 +1,7 @@
 {
   "name": "epm-ai-estimator-backend",
-  "version": "2.0.0",
-  "description": "EPM AI property measurement estimator backend with aerial and street view images",
+  "version": "5.0.0",
+  "description": "EPM AI estimator backend with free lead capture and optional Gmail email notifications",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,6 +12,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.18.3",
     "node-fetch": "^3.3.2",
+    "nodemailer": "^6.9.14",
     "openai": "^4.77.0"
   },
   "type": "module"

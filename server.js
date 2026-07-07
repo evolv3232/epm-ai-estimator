@@ -3,6 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
@@ -21,6 +24,31 @@ const openai = new OpenAI({
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const REGRID_TOKEN = process.env.REGRID_TOKEN || "";
+
+const LEADS_DIR = path.join(process.cwd(), "data");
+const LEADS_FILE = path.join(LEADS_DIR, "leads.json");
+
+function ensureLeadsFile() {
+  if (!fs.existsSync(LEADS_DIR)) fs.mkdirSync(LEADS_DIR, { recursive: true });
+  if (!fs.existsSync(LEADS_FILE)) fs.writeFileSync(LEADS_FILE, "[]", "utf8");
+}
+
+function readLeads() {
+  ensureLeadsFile();
+  try {
+    return JSON.parse(fs.readFileSync(LEADS_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+function saveLead(lead) {
+  ensureLeadsFile();
+  const leads = readLeads();
+  leads.unshift(lead);
+  fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), "utf8");
+  return lead;
+}
 
 function requireEnv() {
   const missing = [];
@@ -266,18 +294,8 @@ Rules:
         role: "user",
         content: [
           { type: "text", text: prompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/png;base64,${satelliteBase64}`
-            }
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/png;base64,${streetBase64}`
-            }
-          }
+          { type: "image_url", image_url: { url: `data:image/png;base64,${satelliteBase64}` } },
+          { type: "image_url", image_url: { url: `data:image/png;base64,${streetBase64}` } }
         ]
       }
     ],
@@ -318,72 +336,207 @@ function quoteFromMetrics(metrics, services) {
   const lineItems = [];
 
   const add = (name, calculation, price) => {
-    lineItems.push({
-      name,
-      calculation,
-      price: Math.round(price)
-    });
+    lineItems.push({ name, calculation, price: Math.round(price) });
   };
 
-  if (services.includes("lawn")) {
-    add("Lawn Care", `${metrics.lawnAreaSqFt} sq ft × $0.025`, metrics.lawnAreaSqFt * 0.025);
-  }
-
-  if (services.includes("surface")) {
-    add("Surface Cleaning", `${metrics.totalSurfaceSqFt} sq ft × $0.20`, metrics.totalSurfaceSqFt * 0.20);
-  }
-
-  if (services.includes("houseWindow")) {
-    add("House & Window Wash", `${metrics.livingAreaSqFt} sq ft × $0.07`, metrics.livingAreaSqFt * 0.07);
-  }
-
-  if (services.includes("fence")) {
-    add("Fence Washing", `${metrics.fenceLinearFt} linear ft × $0.75`, metrics.fenceLinearFt * 0.75);
-  }
-
-  if (services.includes("gutters")) {
-    const price = metrics.stories >= 2 ? 200 : 175;
-    add("Gutter Cleaning", metrics.stories >= 2 ? "Two-story flat rate" : "One-story flat rate", price);
-  }
-
-  if (services.includes("roof")) {
-    add("Roof Cleaning", `${metrics.roofAreaSqFt} sq ft × $0.12`, metrics.roofAreaSqFt * 0.12);
-  }
+  if (services.includes("lawn")) add("Lawn Care", `${metrics.lawnAreaSqFt} sq ft`, 0);
+  if (services.includes("surface")) add("Surface Cleaning", `${metrics.totalSurfaceSqFt} sq ft × $0.20`, metrics.totalSurfaceSqFt * 0.20);
+  if (services.includes("houseWindow")) add("House & Window Wash", `${metrics.livingAreaSqFt} sq ft`, 0);
+  if (services.includes("fence")) add("Fence Washing", `${metrics.fenceLinearFt} linear ft`, 0);
+  if (services.includes("gutters")) add("Gutter Cleaning", metrics.stories >= 2 ? "Two-story flat rate" : "One-story flat rate", metrics.stories >= 2 ? 225 : 175);
+  if (services.includes("roof")) add("Roof Cleaning", `${metrics.roofAreaSqFt} sq ft`, 0);
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.price, 0);
-  let discountRate = 0;
-  if (lineItems.length >= 4) discountRate = 0.15;
-  else if (lineItems.length === 3) discountRate = 0.10;
-  else if (lineItems.length === 2) discountRate = 0.05;
-
-  const savings = Math.round(subtotal * discountRate);
-  const total = subtotal - savings;
-
   return {
     lineItems,
     subtotal,
-    discountRate,
-    savings,
-    total
+    discountRate: 0,
+    savings: 0,
+    total: subtotal
   };
+}
+
+function leadToText(lead) {
+  const q = lead.quote || {};
+  const m = lead.metrics || {};
+  const customer = lead.customer || {};
+
+  let text = "";
+  text += "New EPM Final Quote Request\n\n";
+  text += `Submitted: ${lead.createdAt}\n`;
+  text += `Lead ID: ${lead.id}\n\n`;
+
+  text += "Customer\n";
+  text += `Name: ${customer.name || ""}\n`;
+  text += `Phone: ${customer.phone || ""}\n`;
+  text += `Email: ${customer.email || ""}\n`;
+  text += `Preferred Callback: ${customer.preferredTime || ""}\n`;
+  text += `Notes: ${customer.notes || ""}\n\n`;
+
+  text += "Property\n";
+  text += `Address: ${lead.property?.formattedAddress || ""}\n`;
+  text += `Lat/Lng: ${lead.property?.lat || ""}, ${lead.property?.lng || ""}\n\n`;
+
+  text += "Measurements\n";
+  text += `Stories: ${m.stories || ""}\n`;
+  text += `Parcel: ${m.parcelAreaSqFt || ""} sq ft\n`;
+  text += `Living: ${m.livingAreaSqFt || ""} sq ft\n`;
+  text += `Lawn: ${m.lawnAreaSqFt || ""} sq ft\n`;
+  text += `Driveway: ${m.drivewaySqFt || ""} sq ft\n`;
+  text += `Walkway: ${m.walkwaySqFt || ""} sq ft\n`;
+  text += `Entry/Porch: ${m.entryPorchSqFt || ""} sq ft\n`;
+  text += `Sidewalk: ${m.sidewalkSqFt || ""} sq ft\n`;
+  text += `Total Surface: ${m.totalSurfaceSqFt || ""} sq ft\n`;
+  text += `Fence: ${m.fenceLinearFt || ""} linear ft\n`;
+  text += `Roof: ${m.roofAreaSqFt || ""} sq ft\n`;
+  text += `Window Panes: ${lead.windowPanes || ""}\n\n`;
+
+  text += "Selected Services\n";
+  (lead.selectedServices || []).forEach(item => {
+    text += `- ${item}\n`;
+  });
+
+  text += "\nItemized Quote\n";
+  (q.lines || []).forEach(line => {
+    text += `- ${line.name}: ${line.custom ? "Custom Quote" : "$" + Math.round(line.price || 0)}\n`;
+    (line.children || []).forEach(child => {
+      text += `   • ${child[0]}: ${child[1]} = ${child[2]}\n`;
+    });
+  });
+
+  text += `\nSubtotal: $${q.subtotal || 0}\n`;
+  text += `Discount: ${Math.round((q.discountRate || 0) * 100)}%\n`;
+  text += `Savings: $${q.savings || 0}\n`;
+  text += `Estimated Total: $${q.total || 0}\n`;
+
+  return text;
+}
+
+async function sendLeadEmail(lead) {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  const to = process.env.LEAD_EMAIL_TO || user;
+
+  if (!user || !pass || !to) {
+    return { sent: false, reason: "Email environment variables not configured" };
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass }
+  });
+
+  await transporter.sendMail({
+    from: `"EPM Quote Widget" <${user}>`,
+    to,
+    subject: `New EPM Final Quote Request - ${lead.customer?.name || "Website Lead"}`,
+    text: leadToText(lead)
+  });
+
+  return { sent: true };
 }
 
 app.get("/", (req, res) => {
   res.json({
     ok: true,
     name: "EPM AI Estimator Backend",
-    version: "2.0",
-    endpoints: ["/api/estimate", "/api/property-image"]
+    version: "5.0-leads",
+    endpoints: ["/api/estimate", "/api/property-image", "/api/leads", "/admin"]
   });
+});
+
+app.get("/admin", (req, res) => {
+  const leads = readLeads();
+
+  const rows = leads.map(lead => {
+    const customer = lead.customer || {};
+    const property = lead.property || {};
+    const q = lead.quote || {};
+    return `
+      <tr>
+        <td>${lead.createdAt || ""}</td>
+        <td>${customer.name || ""}</td>
+        <td>${customer.phone || ""}</td>
+        <td>${customer.email || ""}</td>
+        <td>${property.formattedAddress || ""}</td>
+        <td>$${q.total || 0}</td>
+      </tr>
+    `;
+  }).join("");
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>EPM Leads</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; background: #f4f8f3; color: #061b33; }
+          h1 { margin-top: 0; }
+          table { width: 100%; border-collapse: collapse; background: white; }
+          th, td { padding: 10px; border: 1px solid #d7e4d2; font-size: 14px; text-align: left; vertical-align: top; }
+          th { background: #061b33; color: white; }
+        </style>
+      </head>
+      <body>
+        <h1>EPM Website Leads</h1>
+        <p>Total leads: ${leads.length}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Property</th>
+              <th>Estimate</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+    </html>
+  `);
+});
+
+app.get("/api/leads", (req, res) => {
+  res.json({ leads: readLeads() });
+});
+
+app.post("/api/leads", async (req, res) => {
+  try {
+    const lead = {
+      id: "lead_" + Date.now(),
+      createdAt: new Date().toISOString(),
+      ...req.body
+    };
+
+    saveLead(lead);
+
+    let email = { sent: false };
+    try {
+      email = await sendLeadEmail(lead);
+    } catch (emailError) {
+      email = { sent: false, error: emailError.message };
+    }
+
+    res.json({
+      ok: true,
+      leadId: lead.id,
+      saved: true,
+      email,
+      message: "Your estimate was submitted to EPM successfully."
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message || "Lead submission failed" });
+  }
 });
 
 app.get("/api/property-image", async (req, res) => {
   try {
     const { type, lat, lng } = req.query;
 
-    if (!lat || !lng) {
-      return res.status(400).send("Missing lat/lng");
-    }
+    if (!lat || !lng) return res.status(400).send("Missing lat/lng");
 
     const imageUrl =
       type === "street"
@@ -391,10 +544,7 @@ app.get("/api/property-image", async (req, res) => {
         : staticMapUrl(lat, lng, 20, "640x640", "satellite");
 
     const imageRes = await fetch(imageUrl);
-
-    if (!imageRes.ok) {
-      return res.status(imageRes.status).send("Image fetch failed");
-    }
+    if (!imageRes.ok) return res.status(imageRes.status).send("Image fetch failed");
 
     const contentType = imageRes.headers.get("content-type") || "image/png";
     const buffer = Buffer.from(await imageRes.arrayBuffer());
@@ -411,29 +561,17 @@ app.get("/api/property-image", async (req, res) => {
 app.post("/api/estimate", async (req, res) => {
   try {
     const missing = requireEnv();
-    if (missing.length) {
-      return res.status(500).json({
-        error: "Missing required environment variables",
-        missing
-      });
-    }
+    if (missing.length) return res.status(500).json({ error: "Missing required environment variables", missing });
 
     const { address, lat, lng, services = [] } = req.body;
 
     let property = null;
-
     if (lat && lng && address) {
-      property = {
-        formattedAddress: address,
-        lat: Number(lat),
-        lng: Number(lng)
-      };
+      property = { formattedAddress: address, lat: Number(lat), lng: Number(lng) };
     } else if (address) {
       property = await geocodeAddress(address);
     } else {
-      return res.status(400).json({
-        error: "Address is required."
-      });
+      return res.status(400).json({ error: "Address is required." });
     }
 
     const satelliteUrl = staticMapUrl(property.lat, property.lng, 20);
@@ -471,9 +609,7 @@ app.post("/api/estimate", async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      error: error.message || "Estimate failed"
-    });
+    res.status(500).json({ error: error.message || "Estimate failed" });
   }
 });
 

@@ -1,39 +1,39 @@
-# EPM AI Estimator Backend V2
+# EPM AI Estimator V5 - Free Lead Capture
 
-This version adds:
+Upload these files to your GitHub repo and overwrite the old files:
 
-- Aerial/satellite image display
-- Street View image display
-- Backend image proxy so your Google key is not exposed in image URLs
-- AI analysis using both aerial and street-view images
-- EPM Home Profile output
-- EPM quote output
+- server.js
+- package.json
+- wix-widget.html
+- README.md
 
-## Replace these files in GitHub
+Render should redeploy automatically.
 
-Upload these files to your existing `epm-ai-estimator` GitHub repo:
+## What changed
 
-- `server.js`
-- `package.json`
-- `wix-widget.html`
+V5 adds free lead capture.
 
-Then Render should redeploy automatically.
+When the customer clicks **Get My Final Quote**, the widget sends the lead directly to your Render backend.
 
-## Render Environment Variables
+The backend:
+1. Saves the lead to `data/leads.json`
+2. Shows it at `/admin`
+3. Optionally emails you the lead if Gmail SMTP is configured
 
-Keep these:
+## Free lead dashboard
 
-- OPENAI_API_KEY
-- GOOGLE_MAPS_API_KEY
-- REGRID_TOKEN
-- ALLOWED_ORIGIN
+After deploy, open:
 
-No PORT needed.
+https://epm-ai-estimator.onrender.com/admin
 
-## After deploy
+## Optional free email notification with Gmail
 
-Open:
+In Render, add these environment variables:
 
-https://epm-ai-estimator.onrender.com/
+EMAIL_USER=yourgmail@gmail.com
+EMAIL_PASS=your_gmail_app_password
+LEAD_EMAIL_TO=yourgmail@gmail.com
 
-You should see version 2.0.
+Important: EMAIL_PASS must be a Gmail App Password, not your normal Gmail password.
+
+If you skip the email variables, leads still save to `/admin`.
