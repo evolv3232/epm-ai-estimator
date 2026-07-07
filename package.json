@@ -1,7 +1,7 @@
 {
   "name": "epm-ai-estimator-backend",
-  "version": "1.0.0",
-  "description": "EPM AI property measurement estimator backend",
+  "version": "2.0.0",
+  "description": "EPM AI property measurement estimator backend with aerial and street view images",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

@@ -1,19 +1,15 @@
-<!--
-EPM Wix Frontend Widget
-
-Replace:
-https://YOUR-BACKEND-URL.com/api/estimate
-
-with your hosted backend endpoint after deploying the backend.
--->
-
+<!-- EPM AI Quote Widget - Aerial + Street View Version -->
 <div id="epm-ai-widget">
   <div class="epm-box">
-    <h2>EPM Smart Property Estimate</h2>
-    <p>Enter your address, select services, and EPM will generate a working estimate.</p>
+    <div class="epm-header">
+      <h2>EPM Smart Property Estimate</h2>
+      <p>Enter your address, select services, and generate an AI-assisted estimate with aerial and street-view property images.</p>
+    </div>
 
-    <input id="epmAddress" placeholder="Enter property address" />
+    <label class="epm-label">Property Address</label>
+    <input id="epmAddress" class="epm-input" placeholder="Enter property address" />
 
+    <h3>Choose Services</h3>
     <div class="services">
       <label><input type="checkbox" value="lawn"> Lawn Care</label>
       <label><input type="checkbox" value="surface"> Surface Cleaning</label>
@@ -23,7 +19,7 @@ with your hosted backend endpoint after deploying the backend.
       <label><input type="checkbox" value="roof"> Roof Cleaning</label>
     </div>
 
-    <button onclick="getEpmEstimate()">Generate Estimate</button>
+    <button id="epmGenerateBtn" onclick="getEpmEstimate()">Generate My Estimate</button>
 
     <div id="epmResult"></div>
   </div>
@@ -32,75 +28,265 @@ with your hosted backend endpoint after deploying the backend.
 <style>
 #epm-ai-widget {
   font-family: Arial, sans-serif;
-  max-width: 850px;
+  max-width: 960px;
   margin: auto;
-}
-.epm-box {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 26px;
-  box-shadow: 0 12px 35px rgba(0,0,0,.12);
   color: #061b33;
 }
-.epm-box h2 {
+
+.epm-box {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.12);
+  border: 1px solid #d7e4d2;
+}
+
+.epm-header {
+  background: linear-gradient(135deg, #061b33, #123a63);
+  color: white;
+  padding: 24px;
+  border-radius: 16px;
+  margin-bottom: 22px;
+}
+
+.epm-header h2 {
   margin: 0 0 8px;
   font-size: 30px;
 }
-.epm-box p {
-  color: #64748b;
+
+.epm-header p {
+  margin: 0;
+  color: #d9ead8;
+  line-height: 1.45;
 }
-#epmAddress {
-  width: 100%;
-  padding: 14px;
-  font-size: 16px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  box-sizing: border-box;
-  margin: 12px 0;
-}
-.services label {
+
+.epm-label {
   display: block;
-  padding: 8px 0;
+  font-weight: bold;
+  margin-bottom: 8px;
 }
-button {
+
+.epm-input {
   width: 100%;
   padding: 15px;
+  font-size: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  box-sizing: border-box;
+  margin-bottom: 18px;
+}
+
+.services {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.services label {
+  border: 1px solid #d8e2d4;
+  border-radius: 12px;
+  padding: 13px;
+  background: #fbfdfb;
+  cursor: pointer;
+}
+
+.services label:hover {
+  border-color: #2f7d20;
+}
+
+.services input {
+  margin-right: 8px;
+  transform: scale(1.15);
+}
+
+#epmGenerateBtn {
+  width: 100%;
+  padding: 16px;
   background: #2f7d20;
   color: white;
   border: none;
-  border-radius: 9px;
-  font-size: 16px;
+  border-radius: 11px;
+  font-size: 17px;
   font-weight: bold;
-  margin-top: 12px;
+  margin-top: 18px;
   cursor: pointer;
 }
-#epmResult {
-  margin-top: 18px;
+
+#epmGenerateBtn:hover {
+  background: #256818;
 }
+
+#epmResult {
+  margin-top: 22px;
+}
+
+.epm-loading {
+  padding: 16px;
+  background: #f4f8f3;
+  border: 1px solid #d7ead0;
+  border-radius: 12px;
+  color: #2f7d20;
+  font-weight: bold;
+}
+
+.epm-error {
+  padding: 16px;
+  background: #fff1f1;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #b91c1c;
+}
+
+.epm-section {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #d7e4d2;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.epm-section h3 {
+  margin-top: 0;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.image-card {
+  border: 1px solid #d7e4d2;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.image-card img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.image-card strong {
+  display: block;
+  padding: 10px 12px;
+  background: #061b33;
+  color: white;
+  font-size: 14px;
+}
+
 .metric, .line {
   display: flex;
   justify-content: space-between;
+  gap: 14px;
   border-bottom: 1px solid #e2e8f0;
-  padding: 8px 0;
+  padding: 9px 0;
+  font-size: 14px;
 }
+
+.metric:last-child, .line:last-child {
+  border-bottom: none;
+}
+
+.metric span, .line span {
+  color: #475569;
+}
+
+.metric strong, .line strong {
+  color: #061b33;
+  text-align: right;
+}
+
 .total {
-  font-size: 24px;
-  font-weight: bold;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 2px solid #cfe5c8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #061b33;
+  font-size: 18px;
+}
+
+.total strong {
   color: #2f7d20;
+  font-size: 30px;
+}
+
+.epm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.epm-action-btn {
+  text-align: center;
+  text-decoration: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  font-size: 15px;
+}
+
+.primary {
+  background: #2f7d20;
+  color: white;
+}
+
+.secondary {
+  background: #061b33;
+  color: white;
+}
+
+.outline {
+  background: white;
+  color: #061b33;
+  border: 1px solid #cbd5e1;
+}
+
+.small-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #64748b;
   margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .services, .epm-actions, .image-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .epm-box {
+    padding: 18px;
+  }
+
+  .epm-header h2 {
+    font-size: 25px;
+  }
 }
 </style>
 
 <script>
-const EPM_BACKEND_URL = "https://YOUR-BACKEND-URL.com/api/estimate";
+const EPM_BACKEND_BASE = "https://epm-ai-estimator.onrender.com";
+const EPM_BACKEND_URL = EPM_BACKEND_BASE + "/api/estimate";
+const EPM_PHONE = "tel:+12818148804";
+
+let lastEstimateText = "";
 
 async function getEpmEstimate() {
   const address = document.getElementById("epmAddress").value.trim();
-  const selected = Array.from(document.querySelectorAll(".services input:checked")).map(x => x.value);
+  const selected = Array.from(document.querySelectorAll(".services input:checked")).map(function(x) { return x.value; });
   const result = document.getElementById("epmResult");
+  const button = document.getElementById("epmGenerateBtn");
 
   if (!address) {
-    alert("Please enter an address.");
+    alert("Please enter a property address.");
     return;
   }
 
@@ -109,7 +295,9 @@ async function getEpmEstimate() {
     return;
   }
 
-  result.innerHTML = "<p>Generating EPM estimate...</p>";
+  button.disabled = true;
+  button.textContent = "Generating Estimate...";
+  result.innerHTML = '<div class="epm-loading">Generating aerial view, street view, EPM Home Profile, and quote...</div>';
 
   try {
     const res = await fetch(EPM_BACKEND_URL, {
@@ -118,7 +306,7 @@ async function getEpmEstimate() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        address,
+        address: address,
         services: selected
       })
     });
@@ -129,39 +317,145 @@ async function getEpmEstimate() {
       throw new Error(data.error || "Estimate failed.");
     }
 
-    const m = data.metrics;
-    const q = data.quote;
-
-    let html = `
-      <h3>EPM Home Profile</h3>
-      <div class="metric"><span>Property</span><strong>${data.property.formattedAddress}</strong></div>
-      <div class="metric"><span>Living Area</span><strong>${m.livingAreaSqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Lawn Area</span><strong>${m.lawnAreaSqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Driveway</span><strong>${m.drivewaySqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Walkway</span><strong>${m.walkwaySqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Entry / Porch</span><strong>${m.entryPorchSqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Sidewalk</span><strong>${m.sidewalkSqFt.toLocaleString()} sq ft</strong></div>
-      <div class="metric"><span>Fence</span><strong>${m.fenceLinearFt.toLocaleString()} linear ft</strong></div>
-      <div class="metric"><span>Roof</span><strong>${m.roofAreaSqFt.toLocaleString()} sq ft</strong></div>
-
-      <h3>Estimated Quote</h3>
-    `;
-
-    q.lineItems.forEach(item => {
-      html += `<div class="line"><span>${item.name}<br><small>${item.calculation}</small></span><strong>$${item.price.toLocaleString()}</strong></div>`;
-    });
-
-    html += `
-      <div class="line"><span>Subtotal</span><strong>$${q.subtotal.toLocaleString()}</strong></div>
-      <div class="line"><span>Bundle Discount</span><strong>${Math.round(q.discountRate * 100)}%</strong></div>
-      <div class="line"><span>You Save</span><strong>$${q.savings.toLocaleString()}</strong></div>
-      <div class="total">Estimated Total: $${q.total.toLocaleString()}</div>
-      <p><small>${data.disclaimer}</small></p>
-    `;
-
-    result.innerHTML = html;
+    renderEstimate(data);
   } catch (err) {
-    result.innerHTML = `<p style="color:#b91c1c;">${err.message}</p>`;
+    result.innerHTML = '<div class="epm-error">' + err.message + '</div>';
+  } finally {
+    button.disabled = false;
+    button.textContent = "Generate My Estimate";
   }
+}
+
+function money(value) {
+  return "$" + Math.round(value || 0).toLocaleString();
+}
+
+function safeNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function fullImageUrl(path) {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return EPM_BACKEND_BASE + path;
+}
+
+function renderEstimate(data) {
+  const result = document.getElementById("epmResult");
+  const m = data.metrics || {};
+  const q = data.quote || { lineItems: [], subtotal: 0, discountRate: 0, savings: 0, total: 0 };
+
+  lastEstimateText = buildEstimateText(data);
+
+  let html = '';
+
+  html += '<div class="epm-section">';
+  html += '<h3>Property Views</h3>';
+  html += '<div class="image-grid">';
+  html += '<div class="image-card"><strong>Aerial View</strong><img src="' + fullImageUrl(data.images && data.images.satellite) + '" alt="Aerial property view"></div>';
+  html += '<div class="image-card"><strong>Street View</strong><img src="' + fullImageUrl(data.images && data.images.street) + '" alt="Street view property image"></div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '<div class="epm-section">';
+  html += '<h3>EPM Home Profile</h3>';
+  html += '<div class="metric"><span>Property</span><strong>' + data.property.formattedAddress + '</strong></div>';
+  html += '<div class="metric"><span>Property Type</span><strong>' + (m.propertyType || "Residential") + '</strong></div>';
+  html += '<div class="metric"><span>Stories</span><strong>' + (m.stories || "—") + '</strong></div>';
+  html += '<div class="metric"><span>Parcel Area</span><strong>' + safeNumber(m.parcelAreaSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Living Area</span><strong>' + safeNumber(m.livingAreaSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Lawn Area</span><strong>' + safeNumber(m.lawnAreaSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Driveway</span><strong>' + safeNumber(m.drivewaySqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Walkway</span><strong>' + safeNumber(m.walkwaySqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Entry / Porch</span><strong>' + safeNumber(m.entryPorchSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Sidewalk</span><strong>' + safeNumber(m.sidewalkSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Total Surface Cleaning</span><strong>' + safeNumber(m.totalSurfaceSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Fence</span><strong>' + safeNumber(m.fenceLinearFt) + ' linear ft</strong></div>';
+  html += '<div class="metric"><span>Roof Area</span><strong>' + safeNumber(m.roofAreaSqFt) + ' sq ft</strong></div>';
+  html += '<div class="metric"><span>Estimated Windows</span><strong>' + safeNumber(m.windowCount) + '</strong></div>';
+  html += '<div class="metric"><span>Confidence</span><strong>' + (m.confidence || "working estimate") + '</strong></div>';
+  html += '</div>';
+
+  html += '<div class="epm-section">';
+  html += '<h3>Estimated Quote</h3>';
+
+  q.lineItems.forEach(function(item) {
+    html += '<div class="line">';
+    html += '<span><strong>' + item.name + '</strong><br><small>' + item.calculation + '</small></span>';
+    html += '<strong>' + money(item.price) + '</strong>';
+    html += '</div>';
+  });
+
+  html += '<div class="line"><span>Subtotal</span><strong>' + money(q.subtotal) + '</strong></div>';
+  html += '<div class="line"><span>Bundle Discount</span><strong>' + Math.round((q.discountRate || 0) * 100) + '%</strong></div>';
+  html += '<div class="line"><span>You Save</span><strong>' + money(q.savings) + '</strong></div>';
+  html += '<div class="total"><span>Estimated Total</span><strong>' + money(q.total) + '</strong></div>';
+  html += '<p class="small-note">' + (data.disclaimer || "This is a working estimate. Final pricing is confirmed after EPM reviews the property.") + '</p>';
+  html += '</div>';
+
+  html += '<div class="epm-actions">';
+  html += '<button class="epm-action-btn primary" onclick="emailEstimate()">Email Estimate</button>';
+  html += '<a class="epm-action-btn secondary" href="' + EPM_PHONE + '">Call EPM</a>';
+  html += '<button class="epm-action-btn outline" onclick="copyEstimate()">Copy Estimate</button>';
+  html += '<button class="epm-action-btn outline" onclick="window.print()">Print Estimate</button>';
+  html += '</div>';
+
+  result.innerHTML = html;
+}
+
+function buildEstimateText(data) {
+  const m = data.metrics || {};
+  const q = data.quote || { lineItems: [], subtotal: 0, discountRate: 0, savings: 0, total: 0 };
+
+  let text = "EPM Estimated Quote\\n\\n";
+  text += "Property: " + data.property.formattedAddress + "\\n\\n";
+
+  text += "EPM Home Profile\\n";
+  text += "Stories: " + (m.stories || "") + "\\n";
+  text += "Parcel Area: " + (m.parcelAreaSqFt || "") + " sq ft\\n";
+  text += "Living Area: " + (m.livingAreaSqFt || "") + " sq ft\\n";
+  text += "Lawn Area: " + (m.lawnAreaSqFt || "") + " sq ft\\n";
+  text += "Driveway: " + (m.drivewaySqFt || "") + " sq ft\\n";
+  text += "Walkway: " + (m.walkwaySqFt || "") + " sq ft\\n";
+  text += "Entry / Porch: " + (m.entryPorchSqFt || "") + " sq ft\\n";
+  text += "Sidewalk: " + (m.sidewalkSqFt || "") + " sq ft\\n";
+  text += "Total Surface: " + (m.totalSurfaceSqFt || "") + " sq ft\\n";
+  text += "Fence: " + (m.fenceLinearFt || "") + " linear ft\\n";
+  text += "Roof Area: " + (m.roofAreaSqFt || "") + " sq ft\\n";
+  text += "Windows: " + (m.windowCount || "") + "\\n";
+  text += "Confidence: " + (m.confidence || "") + "\\n\\n";
+
+  text += "Services\\n";
+  q.lineItems.forEach(function(item) {
+    text += "- " + item.name + ": " + money(item.price) + " (" + item.calculation + ")\\n";
+  });
+
+  text += "\\nSubtotal: " + money(q.subtotal);
+  text += "\\nBundle Discount: " + Math.round((q.discountRate || 0) * 100) + "%";
+  text += "\\nYou Save: " + money(q.savings);
+  text += "\\nEstimated Total: " + money(q.total);
+  text += "\\n\\nFinal pricing is confirmed after EPM reviews the property.";
+
+  return text;
+}
+
+function emailEstimate() {
+  if (!lastEstimateText) {
+    alert("Generate an estimate first.");
+    return;
+  }
+
+  window.location.href = "mailto:?subject=" + encodeURIComponent("Your EPM Estimated Quote") + "&body=" + encodeURIComponent(lastEstimateText);
+}
+
+function copyEstimate() {
+  if (!lastEstimateText) {
+    alert("Generate an estimate first.");
+    return;
+  }
+
+  navigator.clipboard.writeText(lastEstimateText).then(function() {
+    alert("Estimate copied.");
+  });
 }
 </script>

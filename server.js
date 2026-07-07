@@ -68,9 +68,20 @@ function staticMapUrl(lat, lng, zoom = 20, size = "640x640", maptype = "satellit
   return url.toString();
 }
 
+function streetViewUrl(lat, lng, size = "640x640") {
+  const url = new URL("https://maps.googleapis.com/maps/api/streetview");
+  url.searchParams.set("size", size);
+  url.searchParams.set("location", `${lat},${lng}`);
+  url.searchParams.set("fov", "80");
+  url.searchParams.set("heading", "0");
+  url.searchParams.set("pitch", "5");
+  url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
+  return url.toString();
+}
+
 async function getImageAsBase64(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed to fetch satellite image: ${res.status}`);
+  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
   const arrayBuffer = await res.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   return buffer.toString("base64");
@@ -205,11 +216,11 @@ function regridFallbackProfile(feature) {
   };
 }
 
-async function aiAnalyzeSatellite({ imageBase64, address, lat, lng, fallbackProfile }) {
+async function aiAnalyzeImages({ satelliteBase64, streetBase64, address, lat, lng, fallbackProfile }) {
   const prompt = `
 You are EPM's exterior property estimating assistant.
 
-Analyze the satellite image for the residential property at:
+Analyze the satellite image and street view image for:
 ${address}
 Coordinates: ${lat}, ${lng}
 
@@ -235,15 +246,17 @@ Return ONLY valid JSON with this exact schema:
   "measurementNotes": string[]
 }
 
-Use these fallback values as a starting reference if the image is unclear:
+Use these fallback values as a starting reference if the images are unclear:
 ${JSON.stringify(fallbackProfile, null, 2)}
 
 Rules:
 - Use one solid number for each metric, not a range.
 - Total surface must equal driveway + walkway + entryPorch + sidewalk.
+- Use the satellite image primarily for lawn, concrete, roof, and fence.
+- Use street view primarily for stories, front windows, garage/driveway context, and visible entry/walkway.
 - Be conservative but practical for quoting.
-- If the satellite image is not clear enough, use fallback values and set confidence to "low" or "medium".
-- Do not invent exactness. These are working estimates.
+- If the images are unclear, use fallback values and set confidence to low or medium.
+- Do not claim exactness. These are working estimates.
 `;
 
   const response = await openai.chat.completions.create({
@@ -256,7 +269,13 @@ Rules:
           {
             type: "image_url",
             image_url: {
-              url: `data:image/png;base64,${imageBase64}`
+              url: `data:image/png;base64,${satelliteBase64}`
+            }
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/png;base64,${streetBase64}`
             }
           }
         ]
@@ -291,7 +310,7 @@ Rules:
     windowCount: Math.round(Number(parsed.windowCount || fallbackProfile.windowCount || 20)),
     confidence: parsed.confidence || fallbackProfile.confidence || "medium",
     measurementNotes: Array.isArray(parsed.measurementNotes) ? parsed.measurementNotes : [],
-    source: "Google Satellite + AI Vision + Regrid/EPM fallback"
+    source: "Google Satellite + Google Street View + AI Vision + Regrid/EPM fallback"
   };
 }
 
@@ -353,8 +372,40 @@ app.get("/", (req, res) => {
   res.json({
     ok: true,
     name: "EPM AI Estimator Backend",
-    endpoints: ["/api/estimate"]
+    version: "2.0",
+    endpoints: ["/api/estimate", "/api/property-image"]
   });
+});
+
+app.get("/api/property-image", async (req, res) => {
+  try {
+    const { type, lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).send("Missing lat/lng");
+    }
+
+    const imageUrl =
+      type === "street"
+        ? streetViewUrl(lat, lng, "640x640")
+        : staticMapUrl(lat, lng, 20, "640x640", "satellite");
+
+    const imageRes = await fetch(imageUrl);
+
+    if (!imageRes.ok) {
+      return res.status(imageRes.status).send("Image fetch failed");
+    }
+
+    const contentType = imageRes.headers.get("content-type") || "image/png";
+    const buffer = Buffer.from(await imageRes.arrayBuffer());
+
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Image proxy failed");
+  }
 });
 
 app.post("/api/estimate", async (req, res) => {
@@ -385,14 +436,20 @@ app.post("/api/estimate", async (req, res) => {
       });
     }
 
-    const imageUrl = staticMapUrl(property.lat, property.lng, 20);
-    const imageBase64 = await getImageAsBase64(imageUrl);
+    const satelliteUrl = staticMapUrl(property.lat, property.lng, 20);
+    const streetUrl = streetViewUrl(property.lat, property.lng);
 
-    const regridFeature = await fetchRegridParcel(property.lat, property.lng);
+    const [satelliteBase64, streetBase64, regridFeature] = await Promise.all([
+      getImageAsBase64(satelliteUrl),
+      getImageAsBase64(streetUrl),
+      fetchRegridParcel(property.lat, property.lng)
+    ]);
+
     const fallbackProfile = regridFallbackProfile(regridFeature);
 
-    const metrics = await aiAnalyzeSatellite({
-      imageBase64,
+    const metrics = await aiAnalyzeImages({
+      satelliteBase64,
+      streetBase64,
       address: property.formattedAddress,
       lat: property.lat,
       lng: property.lng,
@@ -403,11 +460,14 @@ app.post("/api/estimate", async (req, res) => {
 
     res.json({
       property,
-      satelliteImageUrl: imageUrl.replace(GOOGLE_MAPS_API_KEY, "GOOGLE_KEY_HIDDEN"),
+      images: {
+        satellite: `/api/property-image?type=satellite&lat=${property.lat}&lng=${property.lng}`,
+        street: `/api/property-image?type=street&lat=${property.lat}&lng=${property.lng}`
+      },
       regridFound: Boolean(regridFeature),
       metrics,
       quote,
-      disclaimer: "This is a working AI estimate. Final pricing is confirmed after EPM reviews the property."
+      disclaimer: "This is a working AI estimate based on available imagery and property data. Final pricing is confirmed after EPM reviews the property."
     });
   } catch (error) {
     console.error(error);

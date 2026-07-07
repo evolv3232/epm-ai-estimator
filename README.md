@@ -1,92 +1,39 @@
-# EPM AI Estimator Backend
+# EPM AI Estimator Backend V2
 
-This is the backend system for the EPM smart quoting workflow.
+This version adds:
 
-## What it does
+- Aerial/satellite image display
+- Street View image display
+- Backend image proxy so your Google key is not exposed in image URLs
+- AI analysis using both aerial and street-view images
+- EPM Home Profile output
+- EPM quote output
 
-Customer enters an address and selected services.
+## Replace these files in GitHub
 
-The backend:
+Upload these files to your existing `epm-ai-estimator` GitHub repo:
 
-1. Geocodes the address with Google.
-2. Pulls a Google Static Maps satellite image.
-3. Optionally pulls parcel data from Regrid.
-4. Sends the satellite image to AI vision.
-5. Generates an EPM Home Profile.
-6. Applies EPM pricing formulas.
-7. Returns a working estimate.
+- `server.js`
+- `package.json`
+- `wix-widget.html`
 
-## Required APIs
+Then Render should redeploy automatically.
 
-Google Cloud:
-- Maps JavaScript API
-- Places API
-- Geocoding API
-- Static Maps API
+## Render Environment Variables
 
-OpenAI:
-- OpenAI API key for vision analysis
+Keep these:
 
-Optional:
-- Regrid parcel token
+- OPENAI_API_KEY
+- GOOGLE_MAPS_API_KEY
+- REGRID_TOKEN
+- ALLOWED_ORIGIN
 
-## Setup
+No PORT needed.
 
-1. Install Node.js.
-2. Open this folder in your terminal.
-3. Run:
+## After deploy
 
-```bash
-npm install
-```
+Open:
 
-4. Copy `.env.example` to `.env`.
+https://epm-ai-estimator.onrender.com/
 
-```bash
-cp .env.example .env
-```
-
-5. Add your API keys inside `.env`.
-
-6. Start the backend:
-
-```bash
-npm start
-```
-
-7. Test in your browser:
-
-```text
-http://localhost:3000
-```
-
-## Test estimate request
-
-Use Postman, Thunder Client, or your frontend:
-
-```json
-{
-  "address": "11751 Greensbrook Garden Dr, Houston, TX",
-  "services": ["lawn", "surface", "houseWindow", "gutters"]
-}
-```
-
-POST to:
-
-```text
-http://localhost:3000/api/estimate
-```
-
-## Important
-
-This is the backend. Wix cannot run this directly inside an HTML embed.
-
-You need to host this backend on:
-- Render
-- Railway
-- Replit
-- Vercel
-- Fly.io
-- Your own VPS
-
-Then your Wix widget calls the hosted backend URL.
+You should see version 2.0.
