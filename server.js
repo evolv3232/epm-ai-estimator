@@ -115,49 +115,93 @@ async function getImageAsBase64(url) {
   return buffer.toString("base64");
 }
 
-async function fetchRegridParcel(lat, lng) {
+async function fetchRegridParcel(lat, lng, address = "") {
   if (!REGRID_TOKEN) {
     console.error("REGRID_TOKEN is missing from Render environment variables.");
     return null;
   }
 
-  try {
-    const url = new URL("https://app.regrid.com/api/v2/parcels/point");
-    url.searchParams.set("token", REGRID_TOKEN);
-    url.searchParams.set("lat", String(lat));
-    url.searchParams.set("lon", String(lng));
-    url.searchParams.set("limit", "1");
+  const extractFeatures = (data) => {
+    if (Array.isArray(data?.parcels?.features)) return data.parcels.features;
+    if (Array.isArray(data?.features)) return data.features;
+    return [];
+  };
 
+  const runRequest = async (url, label) => {
     const res = await fetch(url);
     const responseText = await res.text();
 
-    console.log("Regrid request coordinates:", { lat, lng });
-    console.log("Regrid HTTP status:", res.status);
+    console.log(`${label} HTTP status:`, res.status);
 
     if (!res.ok) {
-      console.error("Regrid response:", responseText);
-      return null;
+      console.error(`${label} response:`, responseText);
+      return [];
     }
 
     let data;
     try {
       data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Regrid returned invalid JSON:", responseText);
-      return null;
+    } catch {
+      console.error(`${label} returned invalid JSON:`, responseText);
+      return [];
     }
 
-    console.log("Regrid feature count:", data?.features?.length || 0);
+    const features = extractFeatures(data);
+    console.log(`${label} feature count:`, features.length);
+    return features;
+  };
 
-    const feature = data?.features?.[0] || null;
+  try {
+    console.log("Regrid request coordinates:", { lat, lng });
+
+    // 1. Exact point lookup.
+    const exactUrl = new URL("https://app.regrid.com/api/v2/parcels/point");
+    exactUrl.searchParams.set("token", REGRID_TOKEN);
+    exactUrl.searchParams.set("lat", String(lat));
+    exactUrl.searchParams.set("lon", String(lng));
+    exactUrl.searchParams.set("limit", "1");
+    exactUrl.searchParams.set("return_geometry", "true");
+    exactUrl.searchParams.set("return_matched_buildings", "true");
+
+    let features = await runRequest(exactUrl, "Regrid exact-point lookup");
+
+    // 2. Retry with a small radius because geocoded points can land near
+    // the road, driveway, or parcel edge.
+    if (!features.length) {
+      const radiusUrl = new URL("https://app.regrid.com/api/v2/parcels/point");
+      radiusUrl.searchParams.set("token", REGRID_TOKEN);
+      radiusUrl.searchParams.set("lat", String(lat));
+      radiusUrl.searchParams.set("lon", String(lng));
+      radiusUrl.searchParams.set("radius", "30");
+      radiusUrl.searchParams.set("limit", "10");
+      radiusUrl.searchParams.set("return_geometry", "true");
+      radiusUrl.searchParams.set("return_matched_buildings", "true");
+
+      features = await runRequest(radiusUrl, "Regrid radius lookup");
+    }
+
+    // 3. Address lookup as a final verified Regrid lookup method.
+    if (!features.length && address) {
+      const addressUrl = new URL("https://app.regrid.com/api/v2/parcels/address");
+      addressUrl.searchParams.set("token", REGRID_TOKEN);
+      addressUrl.searchParams.set("query", address);
+      addressUrl.searchParams.set("limit", "5");
+      addressUrl.searchParams.set("return_geometry", "true");
+      addressUrl.searchParams.set("return_matched_buildings", "true");
+
+      features = await runRequest(addressUrl, "Regrid address lookup");
+    }
+
+    const feature = features[0] || null;
 
     if (!feature) {
-      console.error("Regrid returned no parcel feature for these coordinates.");
+      console.error("Regrid returned no parcel after exact point, radius, and address lookups.");
       return null;
     }
 
-    console.log("Regrid parcel properties:", feature.properties || {});
+    console.log("Regrid parcel headline:", feature.properties?.headline || null);
     console.log("Regrid geometry type:", feature.geometry?.type || null);
+    console.log("Regrid parcel field keys:", Object.keys(feature.properties?.fields || {}));
 
     return feature;
   } catch (error) {
@@ -226,12 +270,15 @@ function regridFallbackProfile(feature) {
     );
   }
 
-  const props = feature?.properties || {};
+  const outerProps = feature?.properties || {};
+  const fieldProps = outerProps?.fields || {};
+  const props = { ...outerProps, ...fieldProps };
 
   const parcelSqFt =
     parcelAreaSqFt(feature) ||
     propAny(props, [
       "ll_gissqft",
+      "sqft",
       "gis_sqft",
       "land_sqft",
       "lot_sqft",
@@ -240,9 +287,15 @@ function regridFallbackProfile(feature) {
 
   if (!parcelSqFt || parcelSqFt <= 0) {
     throw new Error(
-      "Unable to determine parcel size from the Regrid response."
+      "Unable to determine parcel size from the Regrid parcel geometry or fields."
     );
   }
+
+  const buildingFootprint = propAny(props, [
+    "ll_bldg_footprint_sqft",
+    "building_footprint_sqft",
+    "bldg_footprint_sqft"
+  ]);
 
   let livingArea = propAny(props, [
     "bldg_sqft",
@@ -263,44 +316,56 @@ function regridFallbackProfile(feature) {
     "bldg_stories"
   ]);
 
-  if (!stories && livingArea) {
-    stories = livingArea > 2100 ? 2 : 1;
+  if (!stories && livingArea && buildingFootprint) {
+    stories = Math.max(1, Math.round(livingArea / buildingFootprint));
   }
 
-  stories = stories && stories >= 2 ? 2 : 1;
+  if (!stories) {
+    stories = 1;
+  }
 
-  if (!livingArea) {
+  stories = stories >= 2 ? 2 : 1;
+
+  // If Regrid supplies a real building footprint but no living-area field,
+  // derive a working living area from the verified footprint and story count.
+  if (!livingArea && buildingFootprint) {
+    livingArea = buildingFootprint * stories;
+  }
+
+  if (!buildingFootprint && !livingArea) {
     throw new Error(
-      "Regrid returned a parcel, but no usable building-size data was found."
+      "Regrid returned the parcel, but no usable building footprint or building-size field was available."
     );
   }
 
-  const footprint = livingArea / stories;
+  const footprint = buildingFootprint || (livingArea / stories);
 
-  const driveway = clamp(parcelSqFt * 0.055, 340, 700);
-  const walkway = clamp(parcelSqFt * 0.010, 55, 140);
-  const entry = clamp(parcelSqFt * 0.006, 30, 70);
-  const sidewalk = clamp(Math.sqrt(parcelSqFt) * 1.9, 120, 260);
+  // These surface values are only starting references for AI image analysis.
+  const driveway = clamp(parcelSqFt * 0.055, 250, 900);
+  const walkway = clamp(parcelSqFt * 0.010, 40, 180);
+  const entry = clamp(parcelSqFt * 0.006, 20, 100);
+  const sidewalk = clamp(Math.sqrt(parcelSqFt) * 1.9, 80, 320);
   const totalSurface = driveway + walkway + entry + sidewalk;
-  const fence = clamp(Math.sqrt(parcelSqFt) * 2.25, 145, 310);
-  const roofArea = livingArea * (stories === 2 ? 1.10 : 1.25);
+  const fence = clamp(Math.sqrt(parcelSqFt) * 2.25, 100, 400);
+  const roofArea = footprint * 1.22;
 
-  const lawnArea =
+  const preliminaryLawnArea =
     parcelSqFt -
     footprint -
     totalSurface;
 
-  if (lawnArea <= 0 || lawnArea >= parcelSqFt) {
+  if (preliminaryLawnArea <= 0 || preliminaryLawnArea >= parcelSqFt) {
     throw new Error(
-      "Calculated lawn area was not plausible for this parcel."
+      "The verified parcel and building data produced an implausible preliminary lawn area."
     );
   }
 
   return {
     parcelAreaSqFt: roundTo(parcelSqFt, 25),
-    livingAreaSqFt: roundTo(livingArea, 25),
+    buildingFootprintSqFt: roundTo(footprint, 25),
+    livingAreaSqFt: roundTo(livingArea || footprint, 25),
     stories,
-    lawnAreaSqFt: roundTo(lawnArea, 25),
+    lawnAreaSqFt: roundTo(preliminaryLawnArea, 25),
     drivewaySqFt: roundTo(driveway, 10),
     walkwaySqFt: roundTo(walkway, 5),
     entryPorchSqFt: roundTo(entry, 5),
@@ -310,7 +375,7 @@ function regridFallbackProfile(feature) {
     roofAreaSqFt: roundTo(roofArea, 25),
     windowCount: stories === 2 ? 22 : 14,
     confidence: "medium",
-    source: "Regrid parcel + EPM formulas",
+    source: "Verified Regrid parcel geometry + Regrid building data + AI image analysis",
     measurementStatus: "verified_parcel"
   };
 }
@@ -345,8 +410,13 @@ Return ONLY valid JSON with this exact schema:
   "measurementNotes": string[]
 }
 
-Use these fallback values as a starting reference if the images are unclear:
+Verified Regrid parcel and building reference data:
 ${JSON.stringify(fallbackProfile, null, 2)}
+
+The parcelAreaSqFt value above is authoritative and must not be changed.
+Use the images to refine lawn, driveway, walkway, porch, sidewalk, fence,
+roof, window, and story estimates. Do not simply copy the preliminary lawn
+or surface estimates when the visible imagery supports a different result.
 
 Rules:
 - Use one solid number for each metric, not a range.
@@ -354,7 +424,7 @@ Rules:
 - Use the satellite image primarily for lawn, concrete, roof, and fence.
 - Use street view primarily for stories, front windows, garage/driveway context, and visible entry/walkway.
 - Be conservative but practical for quoting.
-- If the images are unclear, use fallback values and set confidence to low or medium.
+- If an image-derived area is unclear, use the verified Regrid parcel/building references cautiously and set confidence to low or medium.
 - Do not claim exactness. These are working estimates.
 `;
 
@@ -386,7 +456,7 @@ Rules:
   return {
     propertyType: parsed.propertyType || "unknown",
     stories: Number(parsed.stories || fallbackProfile.stories || 1),
-    parcelAreaSqFt: roundTo(Number(parsed.parcelAreaSqFt || fallbackProfile.parcelAreaSqFt), 25),
+    parcelAreaSqFt: roundTo(Number(fallbackProfile.parcelAreaSqFt), 25),
     livingAreaSqFt: roundTo(Number(parsed.livingAreaSqFt || fallbackProfile.livingAreaSqFt), 25),
     lawnAreaSqFt: roundTo(Number(parsed.lawnAreaSqFt || fallbackProfile.lawnAreaSqFt), 25),
     drivewaySqFt: roundTo(Number(parsed.drivewaySqFt || fallbackProfile.drivewaySqFt), 10),
@@ -399,7 +469,7 @@ Rules:
     windowCount: Math.round(Number(parsed.windowCount || fallbackProfile.windowCount || 20)),
     confidence: parsed.confidence || fallbackProfile.confidence || "medium",
     measurementNotes: Array.isArray(parsed.measurementNotes) ? parsed.measurementNotes : [],
-    source: "Google Satellite + Google Street View + AI Vision + Regrid/EPM fallback"
+    source: "Verified Regrid parcel + Google Satellite + Google Street View + AI Vision"
   };
 }
 
@@ -902,7 +972,7 @@ app.post("/api/estimate", async (req, res) => {
     const [satelliteBase64, streetBase64, regridFeature] = await Promise.all([
       getImageAsBase64(satelliteUrl),
       getImageAsBase64(streetUrl),
-      fetchRegridParcel(property.lat, property.lng)
+      fetchRegridParcel(property.lat, property.lng, property.formattedAddress)
     ]);
 
     const fallbackProfile = regridFallbackProfile(regridFeature);

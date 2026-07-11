@@ -1,79 +1,49 @@
-# EPM Backend V6 — Complete Lead Storage
+# EPM Backend — Regrid Response Parsing Fix
 
-This backend update stores and displays the entire quote submission.
+This version fixes the real Regrid problem shown in Render logs.
 
-## Replace these files in GitHub
+## Root cause
 
-- `server.js`
-- `package.json`
+Regrid API v2 returns U.S. parcel features under:
 
-Commit the changes. Render should redeploy automatically.
+`response.parcels.features`
 
-## Lead dashboard
+The previous backend only checked:
 
-Open:
+`response.features`
 
-`https://epm-ai-estimator.onrender.com/admin`
+That made a successful HTTP 200 response look like it contained zero parcels.
 
-The dashboard now shows:
+Regrid's standardized fields are also nested under:
 
-- Customer name, phone, email, and notes
-- Property address and metrics
-- Aerial and Street View images
-- Every selected service
-- Maintenance schedule selections
-- Bush, limb, and stain-treatment quantities
-- House-wash sides
-- Every itemized quote line
-- Subtotal, bundle discount, savings, and estimated total
-- Full text copy of the submitted estimate
+`feature.properties.fields`
 
-## Optional admin protection
+The previous code mostly checked only `feature.properties`.
 
-In Render → Environment, add:
+## What this version changes
 
-- Key: `ADMIN_KEY`
-- Value: any private password-like string you choose
+- Reads `data.parcels.features` correctly
+- Still supports direct `data.features` responses
+- Reads nested `feature.properties.fields`
+- Retries with a 30-meter radius when an exact point misses
+- Falls back to Regrid's address endpoint, not invented measurements
+- Uses real Regrid parcel geometry for parcel square footage
+- Uses matched building footprint data when available
+- Keeps the hardcoded 7,200 sq ft fallback removed
+- Locks parcel area so AI cannot overwrite verified Regrid geometry
 
-Then open the dashboard using:
-
-`https://epm-ai-estimator.onrender.com/admin?key=YOUR_ADMIN_KEY`
-
-If `ADMIN_KEY` is not set, `/admin` remains publicly accessible.
-
-## Email environment variables
-
-Keep these in Render:
-
-- `EMAIL_USER`
-- `EMAIL_PASS`
-- `LEAD_EMAIL_TO`
-
-## Important storage note
-
-This version saves leads to `data/leads.json`. A normal Render web-service filesystem can be replaced during redeploys or restarts. Email notifications remain a separate copy of each lead. For durable long-term storage, connect a database or persistent disk later.
-
-
-## No-fallback measurement update
-
-This version removes the hardcoded 7,200 sq ft parcel fallback and the repeated ~4,600 sq ft lawn result.
-
-If Regrid does not return a usable parcel or building size, the API now returns an error instead of inventing measurements.
-
-### Upload instructions
+## Install
 
 1. Extract this ZIP.
-2. In GitHub, replace `server.js` with the included file.
-3. Keep `package.json` unchanged unless GitHub asks you to replace it too.
-4. Commit the changes.
-5. Wait for Render to redeploy and show `Live`.
-6. Test several different properties.
-7. Check Render logs for:
-   - Regrid HTTP status
-   - Regrid feature count
-   - Parcel properties
-   - Geometry type
+2. Replace `server.js` in the GitHub repository.
+3. Commit the change.
+4. Wait for Render to redeploy and show Live.
+5. Test several properties.
+6. Review Render logs.
 
-### Required Render environment variable
+Expected logs now include:
 
-`REGRID_TOKEN` must contain your valid Regrid token.
+- `Regrid exact-point lookup feature count: 1`
+- Parcel headline
+- Geometry type
+- Regrid parcel field keys
