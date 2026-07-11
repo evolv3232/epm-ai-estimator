@@ -27,6 +27,71 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const LEADS_DIR = path.join(process.cwd(), "data");
 const LEADS_FILE = path.join(LEADS_DIR, "leads.json");
 
+const MEASUREMENT_CACHE_FILE = path.join(LEADS_DIR, "property-measurements.json");
+const MEASUREMENT_CACHE_MAX_AGE_MS =
+  Number(process.env.MEASUREMENT_CACHE_DAYS || 14) * 24 * 60 * 60 * 1000;
+
+function readMeasurementCache() {
+  try {
+    if (!fs.existsSync(MEASUREMENT_CACHE_FILE)) return {};
+    return JSON.parse(fs.readFileSync(MEASUREMENT_CACHE_FILE, "utf8") || "{}");
+  } catch (error) {
+    console.error("Measurement cache read error:", error);
+    return {};
+  }
+}
+
+function writeMeasurementCache(cache) {
+  try {
+    if (!fs.existsSync(LEADS_DIR)) fs.mkdirSync(LEADS_DIR, { recursive: true });
+    fs.writeFileSync(
+      MEASUREMENT_CACHE_FILE,
+      JSON.stringify(cache, null, 2),
+      "utf8"
+    );
+  } catch (error) {
+    console.error("Measurement cache write error:", error);
+  }
+}
+
+function normalizeMeasurementKey(property) {
+  const address = String(property?.formattedAddress || "")
+    .trim().toLowerCase().replace(/\s+/g, " ");
+  const lat = Number(property?.lat || 0).toFixed(5);
+  const lng = Number(property?.lng || 0).toFixed(5);
+  return `${address}|${lat}|${lng}`;
+}
+
+function getCachedMeasurements(property) {
+  const cache = readMeasurementCache();
+  const key = normalizeMeasurementKey(property);
+  const entry = cache[key];
+  if (!entry) return null;
+
+  if (!entry.savedAt || Date.now() - entry.savedAt > MEASUREMENT_CACHE_MAX_AGE_MS) {
+    delete cache[key];
+    writeMeasurementCache(cache);
+    return null;
+  }
+  return entry.metrics || null;
+}
+
+function saveCachedMeasurements(property, metrics) {
+  const cache = readMeasurementCache();
+  const key = normalizeMeasurementKey(property);
+  cache[key] = {
+    savedAt: Date.now(),
+    property: {
+      formattedAddress: property.formattedAddress,
+      lat: property.lat,
+      lng: property.lng
+    },
+    metrics
+  };
+  writeMeasurementCache(cache);
+}
+
+
 function ensureLeadsFile() {
   if (!fs.existsSync(LEADS_DIR)) fs.mkdirSync(LEADS_DIR, { recursive: true });
   if (!fs.existsSync(LEADS_FILE)) fs.writeFileSync(LEADS_FILE, "[]", "utf8");
@@ -507,7 +572,7 @@ async function sendLeadEmail(lead) {
   await transporter.sendMail({
     from: `"EPM Quote Widget" <${user}>`,
     to,
-    subject: `New EPM Final Quote Request - ${lead.customer?.name || "Website Lead"}`,
+    subject: `${lead.manualReviewRequired ? "EPM Manual Review Lead" : "New EPM Final Quote Request"} - ${lead.customer?.name || "Website Lead"}`,
     text: leadToText(lead)
   });
 
@@ -518,16 +583,17 @@ app.get("/", (req, res) => {
   res.json({
     ok: true,
     name: "EPM AI Estimator Backend",
-    version: "7.1-openai-only",
-    endpoints: ["/api/estimate", "/api/leads", "/admin"]
+    version: "11.1-stable-measurements",
+    endpoints: ["/api/estimate", "/api/property-image", "/api/leads", "/admin"]
   });
 });
 
 app.get("/api/version", (req, res) => {
   res.json({
     ok: true,
-    version: "7.1-openai-only",
+    version: "11.1-stable-measurements",
     regridUsed: false,
+    leadCapture: true,
     measurementSource: "Google aerial + Google Street View + OpenAI vision"
   });
 });
@@ -592,12 +658,12 @@ app.get("/admin", (req, res) => {
       <details class="lead-card" ${index === 0 ? "open" : ""}>
         <summary>
           <div>
-            <span class="status-pill">${lead.callbackOnly ? "Callback Request" : "Final Quote Request"}</span>
+            <span class="status-pill">${lead.manualReviewRequired ? "Manual Review" : (lead.callbackOnly ? "Callback Request" : "Final Quote Request")}</span>
             <h2>${escapeHtml(customer.name || "Unnamed Lead")}</h2>
             <p>${escapeHtml(property.formattedAddress || "No property address")}</p>
           </div>
           <div class="summary-right">
-            <strong>${moneyDisplay(quote.total)}</strong>
+            <strong>${lead.manualReviewRequired ? "Review Needed" : moneyDisplay(quote.total)}</strong>
             <span>${escapeHtml(formatSubmittedDate(lead.createdAt || lead.submittedAt))}</span>
           </div>
         </summary>
@@ -612,6 +678,8 @@ app.get("/admin", (req, res) => {
               <div><span>Lead ID</span><strong>${escapeHtml(lead.id)}</strong></div>
             </div>
             ${customer.notes ? `<div class="notes"><strong>Customer notes</strong><p>${escapeHtml(customer.notes)}</p></div>` : ""}
+            ${lead.errorContext ? `<div class="notes"><strong>Estimator error/context</strong><p>${escapeHtml(lead.errorContext)}</p></div>` : ""}
+            <div class="notes"><strong>Estimate status</strong><p>${lead.manualReviewRequired ? "No automatic estimate was produced. Contact customer for manual review." : "Preliminary beta estimate submitted for EPM verification."}</p></div>
           </section>
 
           <section>
@@ -794,6 +862,10 @@ app.post("/api/leads", async (req, res) => {
       submittedAt: body.submittedAt || new Date().toISOString(),
       estimateText: body.estimateText || "",
       callbackOnly: Boolean(body.callbackOnly),
+      manualReviewRequired: Boolean(body.manualReviewRequired),
+      preliminaryBeta: body.preliminaryBeta !== false,
+      softwareVersion: body.softwareVersion || "EPM Quote Widget V11",
+      errorContext: body.errorContext || null,
       rawSubmission: body
     };
 
@@ -898,16 +970,23 @@ app.post("/api/estimate", async (req, res) => {
       base64: imageResults[index + 2]
     }));
 
-    const metrics = await aiAnalyzeImages({
-      wideSatelliteBase64,
-      closeSatelliteBase64,
-      streetImages,
-      address: property.formattedAddress,
-      lat: property.lat,
-      lng: property.lng,
-      wideScale: imageGroundDimensions(property.lat, wideZoom),
-      closeScale: imageGroundDimensions(property.lat, closeZoom)
-    });
+    let metrics = getCachedMeasurements(property);
+    const measurementCacheHit = Boolean(metrics);
+
+    if (!metrics) {
+      metrics = await aiAnalyzeImages({
+        wideSatelliteBase64,
+        closeSatelliteBase64,
+        streetImages,
+        address: property.formattedAddress,
+        lat: property.lat,
+        lng: property.lng,
+        wideScale: imageGroundDimensions(property.lat, wideZoom),
+        closeScale: imageGroundDimensions(property.lat, closeZoom)
+      });
+
+      saveCachedMeasurements(property, metrics);
+    }
 
     const quote = quoteFromMetrics(metrics, services);
 
@@ -921,11 +1000,13 @@ app.post("/api/estimate", async (req, res) => {
         source: "OpenAI visual analysis only",
         regridUsed: false,
         aerialZoomLevels: [wideZoom, closeZoom],
-        streetViewHeadings: streetHeadings
+        streetViewHeadings: streetHeadings,
+        measurementCacheHit,
+        measurementCacheDays: Number(process.env.MEASUREMENT_CACHE_DAYS || 14)
       },
       metrics,
       quote,
-      disclaimer: "This is an AI-assisted visual estimate based on Google aerial and Street View imagery. It is not a survey or exact measurement. Final measurements and pricing are confirmed by EPM before service."
+      disclaimer: "EPM Smart Quote is beta software. This is a preliminary AI-assisted visual estimate, not a survey, inspection, contract, or guaranteed price. EPM verifies the scope, measurements, accessibility, buildup, and final price before scheduling service."
     });
   } catch (error) {
     console.error(error);
@@ -934,5 +1015,5 @@ app.post("/api/estimate", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`EPM AI Estimator Backend V7.1 OPENAI-ONLY running on port ${PORT}`);
+  console.log(`EPM Backend V11.1 Stable Measurements running on port ${PORT}`);
 });

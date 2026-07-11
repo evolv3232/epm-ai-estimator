@@ -2,9 +2,14 @@
 <div id="epm-ai-widget">
   <div class="epm-box">
     <div class="epm-header">
-      <div class="epm-kicker">Exterior Property Maintenance</div>
+      <div class="epm-kicker">Exterior Property Maintenance</div><div class="epm-beta-badge">BETA · PRELIMINARY ESTIMATE</div>
       <h2>EPM Smart Property Estimate</h2>
-      <p>Enter your address, choose exactly what you want serviced, and generate an AI-assisted visual estimate using aerial imagery, Street View, and itemized pricing.</p>
+      <p>Enter your address and choose the services you want. EPM Smart Quote uses aerial imagery, Street View, and AI to create a preliminary estimate before EPM verifies the final scope and price.</p>
+    </div>
+
+    <div class="epm-beta-notice">
+      <strong>Preliminary beta estimate</strong>
+      <span>This tool provides a helpful starting estimate—not an exact survey, inspection, contract, or guaranteed final price. EPM reviews every submitted quote before service is scheduled.</span>
     </div>
 
     <div class="epm-steps-guide">
@@ -24,7 +29,7 @@
     
     <div class="epm-panel">
       <h3>Choose Services</h3>
-      <p class="small-note service-intro">Select only the services you are interested in. You will choose a maintenance schedule on the next step. No contact information is required to generate your estimate.</p>
+      <p class="small-note service-intro">Select only the services you are interested in. You will choose a maintenance schedule on the next step. No contact information is required to generate your estimate. Property measurements remain consistent when you change service selections.</p>
 
       <div class="service-category">
         <h4>🌿 Lawn & Plant Maintenance</h4>
@@ -79,7 +84,7 @@
         </div>
         <div class="quantity-card">
           <label for="treeLimbCount">Low Tree Limb Trimming</label>
-          <span class="quantity-help">$8 per pole-pruner-accessible limb, up to about 3-inch diameter</span>
+          <span class="quantity-help">$10 per pole-pruner-accessible limb, up to about 3-inch diameter</span>
           <input id="treeLimbCount" class="epm-input qty-input" type="number" min="0" step="1" value="0" />
         </div>
         <div class="quantity-card">
@@ -103,8 +108,8 @@
 
       <div id="epmDynamicFrequencies" class="frequency-grid"></div>
 
-      <button type="button" id="epmGenerateBtn" onclick="getEpmEstimate()">Generate My Estimate</button>
-      <p class="small-note estimate-privacy-note">No contact information is required to generate your estimate.</p>
+      <button type="button" id="epmGenerateBtn" onclick="getEpmEstimate()">Generate My Preliminary Estimate</button>
+      <p class="small-note estimate-privacy-note">No contact information is required to generate your estimate. Property measurements remain consistent when you change service selections.</p>
     </div>
 
 
@@ -125,7 +130,7 @@
 </div>
 
 <style>
-#epm-ai-widget{font-family:Arial,sans-serif;max-width:1020px;margin:auto;color:#061b33}.epm-box{background:#fff;border-radius:22px;padding:28px;box-shadow:0 16px 46px rgba(0,0,0,.13);border:1px solid #d7e4d2}.epm-header{background:linear-gradient(135deg,#061b33,#123a63);color:#fff;padding:26px;border-radius:18px;margin-bottom:22px}.epm-kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#a7d39f;font-weight:800;margin-bottom:8px}.epm-header h2{margin:0 0 8px;font-size:32px;line-height:1.05}.epm-header p{margin:0;color:#d9ead8;line-height:1.45}.epm-steps-guide{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}.epm-steps-guide div{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d7e4d2;border-radius:12px;background:#f8fbf7;font-size:13px;font-weight:700}.epm-steps-guide strong{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:#2f7d20;color:#fff;font-size:12px}.epm-panel{border:1px solid #d7e4d2;background:#fff;border-radius:16px;padding:18px;margin-top:16px}.epm-label{display:block;font-weight:bold;margin-bottom:8px}.epm-input{width:100%;padding:15px;font-size:16px;border:1px solid #cbd5e1;border-radius:10px;box-sizing:border-box;margin-bottom:12px}.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.epm-textarea{width:100%;min-height:95px;padding:15px;font-size:16px;border:1px solid #cbd5e1;border-radius:10px;box-sizing:border-box;font-family:Arial,sans-serif;resize:vertical}.frequency-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.frequency-card{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb}.frequency-card label{display:block;font-weight:800;font-size:13px;color:#061b33;margin-bottom:8px}.schedule-step{margin-top:18px}.schedule-step-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.schedule-step-header h3{margin:0 0 4px}.frequency-card .frequency-note{display:block;font-size:12px;color:#64748b;margin-top:6px;line-height:1.35}.epm-select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#061b33;font-size:15px;box-sizing:border-box}.quantity-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.quantity-card{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb}.quantity-card label{display:block;font-weight:800;font-size:13px;color:#061b33;margin-bottom:5px}.quantity-help{display:block;font-size:12px;line-height:1.35;color:#64748b;min-height:34px;margin-bottom:8px}.qty-input{margin-bottom:0}#epmMap{width:100%;height:380px;border-radius:15px;background:#dbe4d8;overflow:hidden;margin-bottom:10px}.address-status{font-size:13px;color:#64748b}.services{display:grid;grid-template-columns:1fr 1fr;gap:10px}.service-intro{margin-bottom:16px}.service-category{margin-top:15px;padding-top:4px}.service-category h4{margin:0 0 9px;font-size:15px;color:#061b33}.services label{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb;cursor:pointer;font-weight:600}.services label:hover{border-color:#2f7d20}.services input{margin-right:8px;transform:scale(1.15)}.mini-btn{margin-top:12px;padding:10px 14px;border:1px solid #cbd5e1;background:white;color:#061b33;border-radius:9px;font-weight:800;cursor:pointer}#epmGenerateBtn,#epmScheduleBtn{width:100%;padding:17px;background:#2f7d20;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:bold;margin-top:18px;cursor:pointer}#epmGenerateBtn:hover,#epmScheduleBtn:hover{background:#256818}.estimate-privacy-note{text-align:center;margin:9px 0 0}#epmResult{margin-top:22px}.progress-wrap{margin-top:18px;padding:18px;background:#f4f8f3;border:1px solid #d7ead0;border-radius:16px}.progress-title{font-weight:900;color:#061b33;margin-bottom:12px}.progress-track{height:10px;background:#dbead7;border-radius:999px;overflow:hidden;margin-bottom:14px}.progress-bar{width:0%;height:100%;background:#2f7d20;transition:width .45s ease}.steps{display:grid;gap:8px}.step{display:flex;align-items:center;gap:8px;color:#64748b;font-size:14px}.step span{width:11px;height:11px;border-radius:999px;background:#cbd5e1;display:inline-block}.step.active{color:#061b33;font-weight:800}.step.active span,.step.done span{background:#2f7d20}.step.done{color:#2f7d20;font-weight:800}.epm-error{padding:16px;background:#fff1f1;border:1px solid #fecaca;border-radius:12px;color:#b91c1c;margin-top:18px}.epm-success{padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;color:#166534;margin-top:18px;font-weight:800}.epm-section{margin-top:18px;padding:18px;border:1px solid #d7e4d2;border-radius:16px;background:#fff}.epm-section h3{margin-top:0}.image-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.image-card{border:1px solid #d7e4d2;border-radius:14px;overflow:hidden;background:#f8fafc}.image-card img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover}.image-card strong{display:block;padding:10px 12px;background:#061b33;color:white;font-size:14px}.item-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.item-card{border:1px solid #e2e8f0;border-radius:13px;background:#f8fafc;padding:13px}.item-card .label{display:block;font-size:12px;color:#64748b;margin-bottom:4px}.item-card .value{display:block;font-size:19px;font-weight:800;color:#061b33}.item-card .price{display:block;margin-top:5px;font-size:13px;color:#2f7d20;font-weight:700}.line,.subline{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #e2e8f0;padding:9px 0;font-size:14px}.subline{padding-left:18px;font-size:13px;background:#fbfdfb}.line span,.subline span{color:#475569}.line strong,.subline strong{color:#061b33;text-align:right}.service-group{margin-top:10px;border:1px solid #d7e4d2;border-radius:14px;overflow:hidden;background:white}.group-header{background:#f4f8f3;padding:12px;font-weight:800;color:#061b33;display:flex;justify-content:space-between;gap:12px}.total{margin-top:14px;padding-top:14px;border-top:2px solid #cfe5c8;display:flex;justify-content:space-between;align-items:center;color:#061b33;font-size:18px}.total strong{color:#2f7d20;font-size:30px}.epm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.epm-action-btn{text-align:center;text-decoration:none;padding:14px;border-radius:10px;font-weight:bold;cursor:pointer;border:none;font-size:15px}.primary{background:#2f7d20;color:white}.secondary{background:#061b33;color:white}.outline{background:white;color:#061b33;border:1px solid #cbd5e1}.small-note{font-size:12px;line-height:1.45;color:#64748b;margin-top:12px}.final-quote-box{margin-top:16px;padding:16px;border-radius:16px;background:#f4f8f3;border:1px solid #d7ead0}.final-quote-box strong{color:#061b33}.final-quote-box p{margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.45}@media(max-width:700px){.services,.epm-actions,.image-grid,.item-grid,.contact-grid,.frequency-grid,.quantity-grid,.epm-steps-guide{grid-template-columns:1fr}.epm-box{padding:18px}.epm-header h2{font-size:25px}#epmMap{height:300px}}
+#epm-ai-widget{font-family:Arial,sans-serif;max-width:1020px;margin:auto;color:#061b33}.epm-box{background:#fff;border-radius:22px;padding:28px;box-shadow:0 16px 46px rgba(0,0,0,.13);border:1px solid #d7e4d2}.epm-header{background:linear-gradient(135deg,#061b33,#123a63);color:#fff;padding:26px;border-radius:18px;margin-bottom:22px}.epm-kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#a7d39f;font-weight:800;margin-bottom:8px}.epm-beta-badge{display:inline-block;margin:0 0 10px;padding:6px 9px;border:1px solid rgba(255,255,255,.32);border-radius:999px;background:rgba(255,255,255,.10);font-size:11px;font-weight:900;letter-spacing:.06em}.epm-beta-notice{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:13px 14px;border-radius:13px;background:#fff8e6;border:1px solid #f2d58a;color:#6b4c00;font-size:13px;line-height:1.45}.epm-beta-notice strong{white-space:nowrap}.manual-review-box{margin-top:16px;padding:18px;border:1px solid #f2d58a;background:#fffaf0;border-radius:16px}.manual-review-box h3{margin:0 0 7px;color:#061b33}.manual-review-box p{color:#64748b;font-size:13px;line-height:1.45}.epm-header h2{margin:0 0 8px;font-size:32px;line-height:1.05}.epm-header p{margin:0;color:#d9ead8;line-height:1.45}.epm-steps-guide{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}.epm-steps-guide div{display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #d7e4d2;border-radius:12px;background:#f8fbf7;font-size:13px;font-weight:700}.epm-steps-guide strong{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:#2f7d20;color:#fff;font-size:12px}.epm-panel{border:1px solid #d7e4d2;background:#fff;border-radius:16px;padding:18px;margin-top:16px}.epm-label{display:block;font-weight:bold;margin-bottom:8px}.epm-input{width:100%;padding:15px;font-size:16px;border:1px solid #cbd5e1;border-radius:10px;box-sizing:border-box;margin-bottom:12px}.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.epm-textarea{width:100%;min-height:95px;padding:15px;font-size:16px;border:1px solid #cbd5e1;border-radius:10px;box-sizing:border-box;font-family:Arial,sans-serif;resize:vertical}.frequency-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.frequency-card{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb}.frequency-card label{display:block;font-weight:800;font-size:13px;color:#061b33;margin-bottom:8px}.schedule-step{margin-top:18px}.schedule-step-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.schedule-step-header h3{margin:0 0 4px}.frequency-card .frequency-note{display:block;font-size:12px;color:#64748b;margin-top:6px;line-height:1.35}.epm-select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#061b33;font-size:15px;box-sizing:border-box}.quantity-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.quantity-card{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb}.quantity-card label{display:block;font-weight:800;font-size:13px;color:#061b33;margin-bottom:5px}.quantity-help{display:block;font-size:12px;line-height:1.35;color:#64748b;min-height:34px;margin-bottom:8px}.qty-input{margin-bottom:0}#epmMap{width:100%;height:380px;border-radius:15px;background:#dbe4d8;overflow:hidden;margin-bottom:10px}.address-status{font-size:13px;color:#64748b}.services{display:grid;grid-template-columns:1fr 1fr;gap:10px}.service-intro{margin-bottom:16px}.service-category{margin-top:15px;padding-top:4px}.service-category h4{margin:0 0 9px;font-size:15px;color:#061b33}.services label{border:1px solid #d8e2d4;border-radius:12px;padding:13px;background:#fbfdfb;cursor:pointer;font-weight:600}.services label:hover{border-color:#2f7d20}.services input{margin-right:8px;transform:scale(1.15)}.mini-btn{margin-top:12px;padding:10px 14px;border:1px solid #cbd5e1;background:white;color:#061b33;border-radius:9px;font-weight:800;cursor:pointer}#epmGenerateBtn,#epmScheduleBtn{width:100%;padding:17px;background:#2f7d20;color:#fff;border:none;border-radius:12px;font-size:17px;font-weight:bold;margin-top:18px;cursor:pointer}#epmGenerateBtn:hover,#epmScheduleBtn:hover{background:#256818}.estimate-privacy-note{text-align:center;margin:9px 0 0}#epmResult{margin-top:22px}.progress-wrap{margin-top:18px;padding:18px;background:#f4f8f3;border:1px solid #d7ead0;border-radius:16px}.progress-title{font-weight:900;color:#061b33;margin-bottom:12px}.progress-track{height:10px;background:#dbead7;border-radius:999px;overflow:hidden;margin-bottom:14px}.progress-bar{width:0%;height:100%;background:#2f7d20;transition:width .45s ease}.steps{display:grid;gap:8px}.step{display:flex;align-items:center;gap:8px;color:#64748b;font-size:14px}.step span{width:11px;height:11px;border-radius:999px;background:#cbd5e1;display:inline-block}.step.active{color:#061b33;font-weight:800}.step.active span,.step.done span{background:#2f7d20}.step.done{color:#2f7d20;font-weight:800}.epm-error{padding:16px;background:#fff1f1;border:1px solid #fecaca;border-radius:12px;color:#b91c1c;margin-top:18px}.epm-success{padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;color:#166534;margin-top:18px;font-weight:800}.epm-section{margin-top:18px;padding:18px;border:1px solid #d7e4d2;border-radius:16px;background:#fff}.epm-section h3{margin-top:0}.image-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.image-card{border:1px solid #d7e4d2;border-radius:14px;overflow:hidden;background:#f8fafc}.image-card img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover}.image-card strong{display:block;padding:10px 12px;background:#061b33;color:white;font-size:14px}.item-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.item-card{border:1px solid #e2e8f0;border-radius:13px;background:#f8fafc;padding:13px}.item-card .label{display:block;font-size:12px;color:#64748b;margin-bottom:4px}.item-card .value{display:block;font-size:19px;font-weight:800;color:#061b33}.item-card .price{display:block;margin-top:5px;font-size:13px;color:#2f7d20;font-weight:700}.line,.subline{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid #e2e8f0;padding:9px 0;font-size:14px}.subline{padding-left:18px;font-size:13px;background:#fbfdfb}.line span,.subline span{color:#475569}.line strong,.subline strong{color:#061b33;text-align:right}.service-group{margin-top:10px;border:1px solid #d7e4d2;border-radius:14px;overflow:hidden;background:white}.group-header{background:#f4f8f3;padding:12px;font-weight:800;color:#061b33;display:flex;justify-content:space-between;gap:12px}.total{margin-top:14px;padding-top:14px;border-top:2px solid #cfe5c8;display:flex;justify-content:space-between;align-items:center;color:#061b33;font-size:18px}.total strong{color:#2f7d20;font-size:30px}.epm-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.epm-action-btn{text-align:center;text-decoration:none;padding:14px;border-radius:10px;font-weight:bold;cursor:pointer;border:none;font-size:15px}.primary{background:#2f7d20;color:white}.secondary{background:#061b33;color:white}.outline{background:white;color:#061b33;border:1px solid #cbd5e1}.small-note{font-size:12px;line-height:1.45;color:#64748b;margin-top:12px}.final-quote-box{margin-top:16px;padding:16px;border-radius:16px;background:#f4f8f3;border:1px solid #d7ead0}.final-quote-box strong{color:#061b33}.final-quote-box p{margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.45}@media(max-width:700px){.services,.epm-actions,.image-grid,.item-grid,.contact-grid,.frequency-grid,.quantity-grid,.epm-steps-guide{grid-template-columns:1fr}.epm-box{padding:18px}.epm-header h2{font-size:25px}#epmMap{height:300px}}
 </style>
 
 <script>
@@ -136,7 +141,22 @@ const EPM_LEAD_URL=EPM_BACKEND_BASE+"/api/leads";
 const EPM_PHONE="tel:+12818148804";
 const GOOGLE_MAPS_API_KEY="AIzaSyDnUhkNi4qd30-eCy9HhMJhlkGBBYSD99E";
 let epmMap,epmMarker,selectedAddress="",selectedLat=null,selectedLng=null,lastEstimateText="",lastEstimateData=null,lastQuoteData=null;
-const EPM_PRICING={surfaceRate:.20,fenceRate:1.25,gutterOneStory:175,gutterTwoStory:225,bushRate:6,treeLimbRate:8,stainSpaceRate:75};
+const EPM_PRICING={
+  lawnSqFt:0.015,
+  surfaceSqFt:0.20,
+  houseWashSqFt:0.20,
+  roofSqFt:0.30,
+  fenceLinearFt:1.25,
+  windowPane:4.00,
+  gutterOneStory:175,
+  gutterTwoStory:250,
+  bushEach:6,
+  treeLimbEach:10,
+  stainSpaceEach:75,
+  bundleTwo:0.10,
+  bundleThree:0.15,
+  bundleFourPlus:0.20
+};
 const HOUSE_SIDE_WEIGHTS={front:.30,back:.30,left:.20,right:.20};
 window.initEPMMap=function(){const mapDiv=document.getElementById("epmMap");if(!mapDiv||!window.google||!google.maps)return;const houston={lat:29.7604,lng:-95.3698};epmMap=new google.maps.Map(mapDiv,{center:houston,zoom:11,mapTypeId:"satellite",streetViewControl:false,fullscreenControl:false});epmMarker=new google.maps.Marker({map:epmMap,visible:false});const input=document.getElementById("epmAddress");const autocomplete=new google.maps.places.Autocomplete(input,{fields:["formatted_address","geometry"],types:["address"],componentRestrictions:{country:"us"}});autocomplete.addListener("place_changed",function(){const place=autocomplete.getPlace();if(!place.geometry||!place.geometry.location){alert("Please select an address from the dropdown.");return}selectedAddress=place.formatted_address||input.value;selectedLat=place.geometry.location.lat();selectedLng=place.geometry.location.lng();epmMap.setCenter(place.geometry.location);epmMap.setZoom(20);epmMarker.setPosition(place.geometry.location);epmMarker.setVisible(true);document.getElementById("epmAddressStatus").textContent="Property selected: "+selectedAddress})};
 window.selectFullHouseWash=function(){document.querySelectorAll(".house-side").forEach(function(box){box.checked=true})};
@@ -266,34 +286,220 @@ function selectedFrequencyLines(){
   return lines;
 }
 function getServiceCount(){let count=selectedServices().length;if(selectedHouseSides().length>0)count+=1;return count}
-function getBundleDiscountRate(count){if(count>=4)return .20;if(count===3)return .15;if(count===2)return .10;return 0}
-function money(value){return "$"+Math.round(value||0).toLocaleString()}
+function getBundleDiscountRate(count){
+  if(count>=4)return EPM_PRICING.bundleFourPlus;
+  if(count===3)return EPM_PRICING.bundleThree;
+  if(count===2)return EPM_PRICING.bundleTwo;
+  return 0;
+}
+function roundToNearest5(value){return Math.round(Number(value||0)/5)*5}
+function money(value){return "$"+roundToNearest5(value).toLocaleString()}
+
+const EPM_MEASUREMENT_CACHE_VERSION="v1";
+const EPM_MEASUREMENT_CACHE_DAYS=14;
+
+function normalizedPropertyKey(){
+  const address=(selectedAddress||document.getElementById("epmAddress").value||"")
+    .trim().toLowerCase().replace(/\s+/g," ");
+  const lat=selectedLat?Number(selectedLat).toFixed(5):"";
+  const lng=selectedLng?Number(selectedLng).toFixed(5):"";
+  return "epm_property_measurement_"+EPM_MEASUREMENT_CACHE_VERSION+"_"+address+"_"+lat+"_"+lng;
+}
+
+function getCachedPropertyEstimate(){
+  try{
+    const raw=localStorage.getItem(normalizedPropertyKey());
+    if(!raw)return null;
+    const cached=JSON.parse(raw);
+    const maxAge=EPM_MEASUREMENT_CACHE_DAYS*24*60*60*1000;
+    if(!cached.savedAt||Date.now()-cached.savedAt>maxAge){
+      localStorage.removeItem(normalizedPropertyKey());
+      return null;
+    }
+    return cached.data||null;
+  }catch(e){return null}
+}
+
+function saveCachedPropertyEstimate(data){
+  try{
+    localStorage.setItem(
+      normalizedPropertyKey(),
+      JSON.stringify({savedAt:Date.now(),data:data})
+    );
+  }catch(e){}
+}
+
 function safeNumber(value){return Number(value||0).toLocaleString()}
 function fullImageUrl(path){if(!path)return"";if(path.indexOf("http")===0)return path;return EPM_BACKEND_BASE+path}
-function lawnPrice(n){n=Number(n||0);if(n<=3000)return 50;if(n<=5000)return 70;if(n<=7500)return 90;if(n<=10000)return 110;return null}
-function houseWashFullPrice(n,stories){n=Number(n||0);let base=0;if(n<=2000)base=275;else if(n<=3000)base=375;else if(n<=4000)base=475;else if(n<=5000)base=575;else return null;if(Number(stories||1)>=2)base+=50;return base}
-function windowPanePrice(n){n=Number(n||0);if(n<=20)return 80;if(n<=40)return 140;if(n<=60)return 190;if(n<=80)return 240;return null}
-function roofPrice(n){n=Number(n||0);if(n<=2000)return 300;if(n<=2500)return 375;if(n<=3000)return 450;if(n<=4000)return 550;return null}
-function fencePrice(n){n=Number(n||0);if(n<=100)return 125;if(n<=200)return 225;if(n<=300)return 325;return null}
+function lawnPrice(n){return roundToNearest5(Number(n||0)*EPM_PRICING.lawnSqFt)}
+function houseWashFullPrice(n,stories){return roundToNearest5(Number(n||0)*EPM_PRICING.houseWashSqFt)}
+function windowPanePrice(n){return roundToNearest5(Number(n||0)*EPM_PRICING.windowPane)}
+function roofPrice(n){return roundToNearest5(Number(n||0)*EPM_PRICING.roofSqFt)}
+function fencePrice(n){return roundToNearest5(Number(n||0)*EPM_PRICING.fenceLinearFt)}
 function estimatedPanes(m){return Math.max(0,Math.round(Number(m.windowCount||0)*2))}
-function calculateQuote(m){const services=selectedServices(),sides=selectedHouseSides(),lines=[];if(services.includes("lawn")){const price=lawnPrice(m.lawnAreaSqFt);lines.push({name:"Lawn Care",price,custom:price===null,children:[["Front & Back Lawn",safeNumber(m.lawnAreaSqFt)+" sq ft",price===null?"Custom Quote":money(price)]]})}if(services.includes("surface")){const driveway=Number(m.drivewaySqFt||0)*EPM_PRICING.surfaceRate,walkway=Number(m.walkwaySqFt||0)*EPM_PRICING.surfaceRate,entry=Number(m.entryPorchSqFt||0)*EPM_PRICING.surfaceRate,sidewalk=Number(m.sidewalkSqFt||0)*EPM_PRICING.surfaceRate,total=driveway+walkway+entry+sidewalk;lines.push({name:"Surface Cleaning",price:total,children:[["Driveway",safeNumber(m.drivewaySqFt)+" sq ft × $0.20",money(driveway)],["Walkway",safeNumber(m.walkwaySqFt)+" sq ft × $0.20",money(walkway)],["Entry / Porch",safeNumber(m.entryPorchSqFt)+" sq ft × $0.20",money(entry)],["Sidewalk",safeNumber(m.sidewalkSqFt)+" sq ft × $0.20",money(sidewalk)]]})}if(sides.length>0){const full=houseWashFullPrice(m.livingAreaSqFt,m.stories),children=[];let sideTotal=0;sides.forEach(function(side){const weight=HOUSE_SIDE_WEIGHTS[side]||.25,sidePrice=full===null?null:full*weight;sideTotal+=sidePrice||0;children.push([side.charAt(0).toUpperCase()+side.slice(1)+" Side",Math.round(weight*100)+"% of full house wash",sidePrice===null?"Custom Quote":money(sidePrice)])});lines.push({name:"House Wash",price:full===null?null:sideTotal,custom:full===null,children})}if(services.includes("windowPanes")){const panes=estimatedPanes(m),price=windowPanePrice(panes);lines.push({name:"Exterior Window Pane Cleaning",price,custom:price===null,children:[["Exterior Window Panes",safeNumber(panes)+" estimated panes",price===null?"Custom Quote":money(price)]]})}if(services.includes("fence")){const price=fencePrice(m.fenceLinearFt);lines.push({name:"Fence Washing",price,custom:price===null,children:[["Fence",safeNumber(m.fenceLinearFt)+" linear ft",price===null?"Custom Quote":money(price)]]})}if(services.includes("gutters")){const price=Number(m.stories||1)>=2?EPM_PRICING.gutterTwoStory:EPM_PRICING.gutterOneStory;lines.push({name:"Gutter Cleaning",price,children:[["Gutters",Number(m.stories||1)>=2?"Two-story flat rate":"One-story flat rate",money(price)]]})}if(services.includes("roof")){const price=roofPrice(m.roofAreaSqFt);lines.push({name:"Roof Cleaning",price,custom:price===null,children:[["Roof",safeNumber(m.roofAreaSqFt)+" sq ft",price===null?"Custom Quote":money(price)]]})}const addOns=selectedAddOnQuantities();if(services.includes("bushes")){const price=addOns.bushes*EPM_PRICING.bushRate;lines.push({name:"Hedge & Bush Trimming",price,children:[["Bushes",addOns.bushes+" × $6 (up to 6 ft × 6 ft)",money(price)]]})}if(services.includes("treeLimbs")){const price=addOns.treeLimbs*EPM_PRICING.treeLimbRate;lines.push({name:"Low Tree Limb Trimming",price,children:[["Pole-pruner-accessible limbs",addOns.treeLimbs+" × $8",money(price)],["Service limit","No climbing; large or unsafe limbs require custom quote",""] ]})}if(services.includes("stainRemoval")){const price=addOns.stainSpaces*EPM_PRICING.stainSpaceRate;lines.push({name:"Oil / Rust / Paint Removal",price,children:[["Affected car spaces",addOns.stainSpaces+" × $75",money(price)],["Treatment note","Deep stains may require multiple treatments",""] ]})}const pricedLines=lines.filter(line=>line.price!==null&&line.price!==undefined),subtotal=pricedLines.reduce((sum,item)=>sum+Number(item.price||0),0),discountRate=getBundleDiscountRate(lines.length),savings=Math.round(subtotal*discountRate),total=Math.round(subtotal-savings);return{lines,subtotal:Math.round(subtotal),discountRate,savings,total}}
+function calculateQuote(m){const services=selectedServices(),sides=selectedHouseSides(),lines=[];if(services.includes("lawn")){const price=lawnPrice(m.lawnAreaSqFt);lines.push({name:"Lawn Care",price,custom:price===null,children:[["Mowable Lawn Area",safeNumber(m.lawnAreaSqFt)+" estimated mowable sq ft",money(price)]]})}if(services.includes("surface")){const driveway=roundToNearest5(Number(m.drivewaySqFt||0)*EPM_PRICING.surfaceSqFt),walkway=roundToNearest5(Number(m.walkwaySqFt||0)*EPM_PRICING.surfaceSqFt),entry=roundToNearest5(Number(m.entryPorchSqFt||0)*EPM_PRICING.surfaceSqFt),sidewalk=roundToNearest5(Number(m.sidewalkSqFt||0)*EPM_PRICING.surfaceSqFt),total=driveway+walkway+entry+sidewalk;lines.push({name:"Surface Cleaning",price:total,children:[["Driveway",safeNumber(m.drivewaySqFt)+" estimated sq ft",money(driveway)],["Walkway",safeNumber(m.walkwaySqFt)+" estimated sq ft",money(walkway)],["Entry / Porch",safeNumber(m.entryPorchSqFt)+" estimated sq ft",money(entry)],["Sidewalk",safeNumber(m.sidewalkSqFt)+" estimated sq ft",money(sidewalk)]]})}if(sides.length>0){const full=houseWashFullPrice(m.livingAreaSqFt,m.stories),children=[];let sideTotal=0;sides.forEach(function(side){const weight=HOUSE_SIDE_WEIGHTS[side]||.25,sidePrice=roundToNearest5(full*weight);sideTotal+=sidePrice||0;children.push([side.charAt(0).toUpperCase()+side.slice(1)+" Side","Selected side of home",sidePrice===null?"Custom Quote":money(sidePrice)])});lines.push({name:"House Wash",price:full===null?null:sideTotal,custom:full===null,children})}if(services.includes("windowPanes")){const panes=estimatedPanes(m),price=windowPanePrice(panes);lines.push({name:"Exterior Window Pane Cleaning",price,custom:price===null,children:[["Exterior Window Panes",safeNumber(panes)+" estimated panes",price===null?"Custom Quote":money(price)]]})}if(services.includes("fence")){const price=fencePrice(m.fenceLinearFt);lines.push({name:"Fence Washing",price,custom:price===null,children:[["Fence",safeNumber(m.fenceLinearFt)+" linear ft",price===null?"Custom Quote":money(price)]]})}if(services.includes("gutters")){const price=roundToNearest5(Number(m.stories||1)>=2?EPM_PRICING.gutterTwoStory:EPM_PRICING.gutterOneStory);lines.push({name:"Gutter Cleaning",price,children:[["Gutters",Number(m.stories||1)>=2?"Two-story flat rate":"One-story flat rate",money(price)]]})}if(services.includes("roof")){const price=roofPrice(m.roofAreaSqFt);lines.push({name:"Roof Cleaning",price,custom:price===null,children:[["Roof",safeNumber(m.roofAreaSqFt)+" sq ft",price===null?"Custom Quote":money(price)]]})}const addOns=selectedAddOnQuantities();if(services.includes("bushes")){const price=roundToNearest5(addOns.bushes*EPM_PRICING.bushEach);lines.push({name:"Hedge & Bush Trimming",price,children:[["Bushes",addOns.bushes+" bushes selected",money(price)]]})}if(services.includes("treeLimbs")){const price=roundToNearest5(addOns.treeLimbs*EPM_PRICING.treeLimbEach);lines.push({name:"Low Tree Limb Trimming",price,children:[["Pole-pruner-accessible limbs",addOns.treeLimbs+" limbs selected",money(price)],["Service limit","No climbing; large or unsafe limbs require custom quote",""] ]})}if(services.includes("stainRemoval")){const price=roundToNearest5(addOns.stainSpaces*EPM_PRICING.stainSpaceEach);lines.push({name:"Oil / Rust / Paint Removal",price,children:[["Affected car spaces",addOns.stainSpaces+" affected car spaces",money(price)],["Treatment note","Deep stains may require multiple treatments",""] ]})}const pricedLines=lines.filter(line=>line.price!==null&&line.price!==undefined),subtotal=roundToNearest5(pricedLines.reduce((sum,item)=>sum+Number(item.price||0),0)),discountRate=getBundleDiscountRate(lines.length),savings=roundToNearest5(subtotal*discountRate),total=roundToNearest5(subtotal-savings);return{lines,subtotal,discountRate,savings,total}}
 function updateProgress(step){const percentMap={1:12,2:32,3:55,4:78,5:100},bar=document.getElementById("progressBar");if(bar)bar.style.width=percentMap[step]+"%";for(let i=1;i<=5;i++){const el=document.getElementById("step"+i);if(!el)continue;el.classList.remove("active","done");if(i<step)el.classList.add("done");if(i===step)el.classList.add("active")}}
 async function runProgressSequence(){document.getElementById("epmProgress").style.display="block";updateProgress(1);await new Promise(r=>setTimeout(r,400));updateProgress(2);await new Promise(r=>setTimeout(r,550));updateProgress(3);await new Promise(r=>setTimeout(r,650));updateProgress(4)}
-window.getEpmEstimate=async function(){const addressInput=document.getElementById("epmAddress").value.trim(),result=document.getElementById("epmResult"),button=document.getElementById("epmGenerateBtn");if(!addressInput){alert("Please enter a property address.");return}if(getServiceCount()===0){alert("Please select at least one service.");return}const selected=selectedServices(),q=selectedAddOnQuantities();if(selected.includes("bushes")&&q.bushes<1){alert("Enter the number of bushes you want trimmed.");return}if(selected.includes("treeLimbs")&&q.treeLimbs<1){alert("Enter the number of tree limbs you want trimmed.");return}if(selected.includes("stainRemoval")&&q.stainSpaces<1){alert("Enter the number of affected car spaces.");return}button.disabled=true;button.textContent="Generating Estimate...";result.innerHTML="";const progressPromise=runProgressSequence();try{const payload={address:selectedAddress||addressInput,services:["lawn"]};if(selectedLat&&selectedLng){payload.lat=selectedLat;payload.lng=selectedLng}const res=await fetch(EPM_BACKEND_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}),data=await res.json();if(!res.ok)throw new Error(data.error||"Estimate failed.");await progressPromise;updateProgress(5);await new Promise(r=>setTimeout(r,250));renderEstimate(data)}catch(err){result.innerHTML='<div class="epm-error">'+err.message+"</div>"}finally{button.disabled=false;button.textContent="Generate My Estimate"}};
+window.getEpmEstimate=async function(){
+  const addressInput=document.getElementById("epmAddress").value.trim();
+  const result=document.getElementById("epmResult");
+  const button=document.getElementById("epmGenerateBtn");
+
+  if(!addressInput){alert("Please enter a property address.");return}
+  if(getServiceCount()===0){alert("Please select at least one service.");return}
+
+  const selected=selectedServices(),q=selectedAddOnQuantities();
+  if(selected.includes("bushes")&&q.bushes<1){alert("Enter the number of bushes you want trimmed.");return}
+  if(selected.includes("treeLimbs")&&q.treeLimbs<1){alert("Enter the number of tree limbs you want trimmed.");return}
+  if(selected.includes("stainRemoval")&&q.stainSpaces<1){alert("Enter the number of affected car spaces.");return}
+
+  button.disabled=true;
+  button.textContent="Generating Preliminary Estimate...";
+  result.innerHTML="";
+  const progressPromise=runProgressSequence();
+  const controller=new AbortController();
+  const timeout=setTimeout(function(){controller.abort()},90000);
+
+  try{
+    const cachedEstimate=getCachedPropertyEstimate();
+    if(cachedEstimate){
+      await progressPromise;
+      updateProgress(5);
+      await new Promise(function(resolve){setTimeout(resolve,150)});
+      renderEstimate(cachedEstimate);
+      return;
+    }
+
+    const estimateServices=selectedServices().slice();
+    if(selectedHouseSides().length>0)estimateServices.push("houseWash");
+
+    const payload={address:selectedAddress||addressInput,services:estimateServices};
+    if(selectedLat&&selectedLng){payload.lat=selectedLat;payload.lng=selectedLng}
+
+    const res=await fetch(EPM_BACKEND_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload),
+      signal:controller.signal
+    });
+
+    const raw=await res.text();
+    let data={};
+    try{data=raw?JSON.parse(raw):{}}catch(e){
+      throw new Error("The estimator returned an unreadable response.")
+    }
+
+    if(!res.ok)throw new Error(data.error||"The automatic estimate could not be completed.");
+
+    saveCachedPropertyEstimate(data);
+
+    await progressPromise;
+    updateProgress(5);
+    await new Promise(function(resolve){setTimeout(resolve,250)});
+    renderEstimate(data);
+  }catch(err){
+    const message=err&&err.name==="AbortError"
+      ?"The automatic estimate took too long to complete."
+      :(err.message||"The automatic estimate could not be completed.");
+    result.innerHTML=renderManualReviewForm(message);
+    document.getElementById("epmProgress").style.display="none";
+  }finally{
+    clearTimeout(timeout);
+    button.disabled=false;
+    button.textContent="Generate My Preliminary Estimate";
+  }
+};
+
 function itemCard(label,value,price){return'<div class="item-card"><span class="label">'+label+'</span><span class="value">'+value+'</span><span class="price">'+price+"</span></div>"}function finalQuoteContactForm(){return '<div class="epm-section contact-panel" id="epmFinalQuoteContact"><h3>Get Your Final Quote</h3><p class="small-note">Your estimate is ready. Enter your name and phone number so EPM can verify the scope and confirm your final price. Email and notes are optional.</p><div class="contact-grid"><input id="epmCustomerName" class="epm-input" placeholder="Full Name *" /><input id="epmCustomerPhone" class="epm-input" placeholder="Phone Number *" inputmode="tel" /><input id="epmCustomerEmail" class="epm-input" placeholder="Email Address (optional)" inputmode="email" /></div><textarea id="epmNotes" class="epm-textarea" placeholder="Anything specific you want EPM to know? (optional)"></textarea></div>';}
+
+function escapeWidgetText(value){
+  return String(value||"")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+}
+
+function renderManualReviewForm(errorMessage){
+  return '<div class="epm-error"><strong>Automatic estimate unavailable.</strong><br>'+escapeWidgetText(errorMessage)+'</div>'+
+  '<div class="manual-review-box">'+
+    '<h3>Still get your free quote</h3>'+
+    '<p>Submit your address and selected services. EPM will review the property manually and contact you. You will not lose your opportunity just because the beta estimator could not finish.</p>'+
+    '<div class="contact-grid">'+
+      '<input id="epmManualName" class="epm-input" placeholder="Full Name *" />'+
+      '<input id="epmManualPhone" class="epm-input" placeholder="Phone Number *" inputmode="tel" />'+
+      '<input id="epmManualEmail" class="epm-input" placeholder="Email Address (optional)" inputmode="email" />'+
+    '</div>'+
+    '<textarea id="epmManualNotes" class="epm-textarea" placeholder="Anything else EPM should know? (optional)"></textarea>'+
+    '<button type="button" class="epm-action-btn primary" style="width:100%;margin-top:12px" onclick="submitManualReview()">Send to EPM for Review</button>'+
+  '</div>';
+}
+
+window.submitManualReview=async function(){
+  const name=(document.getElementById("epmManualName")||{}).value||"";
+  const phone=(document.getElementById("epmManualPhone")||{}).value||"";
+  const email=(document.getElementById("epmManualEmail")||{}).value||"";
+  const notes=(document.getElementById("epmManualNotes")||{}).value||"";
+
+  if(!name.trim()||!phone.trim()){
+    alert("Please enter your full name and phone number.");
+    return;
+  }
+
+  const errorBox=document.querySelector("#epmResult .epm-error");
+  const errorContext=errorBox?errorBox.textContent.trim():"Automatic estimate unavailable.";
+
+  const payload={
+    customer:{name:name.trim(),phone:phone.trim(),email:email.trim(),notes:notes.trim()},
+    property:{
+      formattedAddress:selectedAddress||document.getElementById("epmAddress").value.trim(),
+      lat:selectedLat,
+      lng:selectedLng
+    },
+    selectedServices:selectedServiceLabels(),
+    serviceFrequencies:selectedFrequencyLines(),
+    addOnQuantities:selectedAddOnQuantities(),
+    houseWashSides:selectedHouseSides(),
+    manualReviewRequired:true,
+    preliminaryBeta:true,
+    softwareVersion:"EPM Quote Widget V12.1.1 Stable Measurements Beta",
+    errorContext:errorContext,
+    submittedAt:new Date().toISOString(),
+    estimateText:"Manual property review requested because the beta estimator did not complete."
+  };
+
+  try{
+    const res=await fetch(EPM_LEAD_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    const raw=await res.text();
+    let data={};
+    try{data=raw?JSON.parse(raw):{}}catch(e){}
+    if(!res.ok)throw new Error(data.error||"Submission failed.");
+
+    document.getElementById("epmResult").innerHTML=
+      '<div class="epm-success"><strong>Your request was saved.</strong><br>EPM will manually review the property and contact you about a preliminary quote.</div>';
+  }catch(err){
+    alert((err&&err.message)||"We could not save your request. Please call EPM at 281-814-8804.");
+  }
+};
+
 function renderEstimate(data){const result=document.getElementById("epmResult"),m=data.metrics||{},q=calculateQuote(m),panes=estimatedPanes(m);lastQuoteData=q;lastEstimateData=data;lastEstimateText=buildEstimateText(data,q);let html="";html+='<div class="epm-section"><h3>Property Views</h3><div class="image-grid">';html+='<div class="image-card"><strong>Aerial View</strong><img src="'+fullImageUrl(data.images&&data.images.satellite)+'" alt="Aerial property view"></div>';html+='<div class="image-card"><strong>Street View</strong><img src="'+fullImageUrl(data.images&&data.images.street)+'" alt="Street view property image"></div></div></div>';html+='<div class="epm-section"><h3>Measurements for Your Selected Services</h3><div class="item-grid">';
 const selectedForProfile=selectedServices(),selectedSidesForProfile=selectedHouseSides(),addOnQty=selectedAddOnQuantities();
 
 if(selectedForProfile.includes("lawn")){
-  html+=itemCard("Lawn Area",safeNumber(m.lawnAreaSqFt)+" sq ft",lawnPrice(m.lawnAreaSqFt)===null?"Custom Quote":money(lawnPrice(m.lawnAreaSqFt)));
+  html+=itemCard("Lawn Area",safeNumber(m.lawnAreaSqFt)+" sq ft",money(lawnPrice(m.lawnAreaSqFt)));
 }
 
 if(selectedForProfile.includes("surface")){
-  html+=itemCard("Driveway",safeNumber(m.drivewaySqFt)+" sq ft",money(Number(m.drivewaySqFt||0)*EPM_PRICING.surfaceRate));
-  html+=itemCard("Walkway",safeNumber(m.walkwaySqFt)+" sq ft",money(Number(m.walkwaySqFt||0)*EPM_PRICING.surfaceRate));
-  html+=itemCard("Entry / Porch",safeNumber(m.entryPorchSqFt)+" sq ft",money(Number(m.entryPorchSqFt||0)*EPM_PRICING.surfaceRate));
-  html+=itemCard("Sidewalk",safeNumber(m.sidewalkSqFt)+" sq ft",money(Number(m.sidewalkSqFt||0)*EPM_PRICING.surfaceRate));
-  html+=itemCard("Total Surface",safeNumber(m.totalSurfaceSqFt)+" sq ft",money(Number(m.totalSurfaceSqFt||0)*EPM_PRICING.surfaceRate));
+  html+=itemCard("Driveway",safeNumber(m.drivewaySqFt)+" sq ft",money(roundToNearest5(Number(m.drivewaySqFt||0)*EPM_PRICING.surfaceSqFt)));
+  html+=itemCard("Walkway",safeNumber(m.walkwaySqFt)+" sq ft",money(roundToNearest5(Number(m.walkwaySqFt||0)*EPM_PRICING.surfaceSqFt)));
+  html+=itemCard("Entry / Porch",safeNumber(m.entryPorchSqFt)+" sq ft",money(roundToNearest5(Number(m.entryPorchSqFt||0)*EPM_PRICING.surfaceSqFt)));
+  html+=itemCard("Sidewalk",safeNumber(m.sidewalkSqFt)+" sq ft",money(roundToNearest5(Number(m.sidewalkSqFt||0)*EPM_PRICING.surfaceSqFt)));
+  html+=itemCard("Total Surface",safeNumber(m.totalSurfaceSqFt)+" sq ft",money(roundToNearest5(Number(m.totalSurfaceSqFt||0)*EPM_PRICING.surfaceSqFt)));
 }
 
 if(selectedSidesForProfile.length>0){
@@ -318,18 +524,18 @@ if(selectedForProfile.includes("fence")){
 }
 
 if(selectedForProfile.includes("bushes")){
-  html+=itemCard("Bushes Selected",safeNumber(addOnQty.bushes),money(addOnQty.bushes*EPM_PRICING.bushRate));
+  html+=itemCard("Bushes Selected",safeNumber(addOnQty.bushes),money(addOnQty.bushes*EPM_PRICING.bushEach));
 }
 
 if(selectedForProfile.includes("treeLimbs")){
-  html+=itemCard("Tree Limbs Selected",safeNumber(addOnQty.treeLimbs),money(addOnQty.treeLimbs*EPM_PRICING.treeLimbRate));
+  html+=itemCard("Tree Limbs Selected",safeNumber(addOnQty.treeLimbs),money(addOnQty.treeLimbs*EPM_PRICING.treeLimbEach));
 }
 
 if(selectedForProfile.includes("stainRemoval")){
-  html+=itemCard("Affected Car Spaces",safeNumber(addOnQty.stainSpaces),money(addOnQty.stainSpaces*EPM_PRICING.stainSpaceRate));
+  html+=itemCard("Affected Car Spaces",safeNumber(addOnQty.stainSpaces),money(addOnQty.stainSpaces*EPM_PRICING.stainSpaceEach));
 }
 
-html+='</div><p class="small-note">Only measurements and prices related to the services you selected are shown. These are AI-assisted visual working measurements; final pricing is confirmed after EPM review.</p></div>';html+='<div class="epm-section"><h3>Selected Maintenance Schedule</h3>';selectedFrequencyLines().forEach(function(line){html+='<div class="line"><span>'+line.split(": ")[0]+'</span><strong>'+line.split(": ")[1]+'</strong></div>'});html+='<p class="small-note">Your selected schedule helps EPM plan future service. It does not change the estimate price until your final quote is verified.</p></div>';html+='<div class="epm-section"><h3>Itemized Estimated Quote</h3>';q.lines.forEach(function(item){html+='<div class="service-group"><div class="group-header"><span>'+item.name+"</span><strong>"+(item.custom?"Custom Quote":money(item.price))+"</strong></div>";item.children.forEach(function(child){html+='<div class="subline"><span>'+child[0]+"<br><small>"+child[1]+"</small></span><strong>"+child[2]+"</strong></div>"});html+="</div>"});html+='<div class="line"><span>Subtotal</span><strong>'+money(q.subtotal)+'</strong></div><div class="line"><span>Bundle Discount</span><strong>'+Math.round((q.discountRate||0)*100)+'%</strong></div><div class="line"><span>You Save</span><strong>'+money(q.savings)+'</strong></div><div class="total"><span>Estimated Total</span><strong>'+money(q.total)+'</strong></div><p class="small-note">Bundle & Save: 2 services = 10% off, 3 services = 15% off, 4+ services = 20% off. Maintenance frequency helps plan future service, but does not lower pricing without a confirmed agreement. Final pricing is confirmed after EPM reviews the property.</p></div>';html+='<div id="leadSuccess"></div>';html+=finalQuoteContactForm();html+='<div class="final-quote-box"><strong>Next Step: Final Quote Confirmation</strong><p>Your estimate is complete. Submit it to EPM so we can verify the scope, account for accessibility and buildup severity, and confirm your final price before service is scheduled.</p></div>';html+='<div class="epm-actions"><button class="epm-action-btn primary" onclick="getFinalQuote(event)">Get My Final Quote</button><a class="epm-action-btn secondary" href="'+EPM_PHONE+'">Call EPM</a><button class="epm-action-btn outline" onclick="requestCallback()">Request Callback</button><button class="epm-action-btn outline" onclick="emailEstimate()">Email My Estimate</button><button class="epm-action-btn outline" onclick="window.print()">Download / Print PDF</button></div>';result.innerHTML=html}
+html+='</div><p class="small-note">Only measurements and prices related to your selected services are shown. This beta result is preliminary and AI-assisted. The same property measurements are reused when service selections change. EPM verifies the scope, measurements, accessibility, and final price.</p></div>';html+='<div class="epm-section"><h3>Selected Maintenance Schedule</h3>';selectedFrequencyLines().forEach(function(line){html+='<div class="line"><span>'+line.split(": ")[0]+'</span><strong>'+line.split(": ")[1]+'</strong></div>'});html+='<p class="small-note">Your selected schedule helps EPM plan future service. It does not change the estimate price until your final quote is verified.</p></div>';html+='<div class="epm-section"><h3>Preliminary Itemized Estimate</h3>';q.lines.forEach(function(item){html+='<div class="service-group"><div class="group-header"><span>'+item.name+"</span><strong>"+(item.custom?"Custom Quote":money(item.price))+"</strong></div>";item.children.forEach(function(child){html+='<div class="subline"><span>'+child[0]+"<br><small>"+child[1]+"</small></span><strong>"+child[2]+"</strong></div>"});html+="</div>"});html+='<div class="line"><span>Subtotal</span><strong>'+money(q.subtotal)+'</strong></div><div class="line"><span>Bundle Discount</span><strong>'+Math.round((q.discountRate||0)*100)+'%</strong></div><div class="line"><span>You Save</span><strong>'+money(q.savings)+'</strong></div><div class="total"><span>Preliminary Estimated Total</span><strong>'+money(q.total)+'</strong></div><p class="small-note">Bundle & Save: 2 services = 10% off, 3 services = 15% off, 4+ services = 20% off. Maintenance frequency helps plan future service, but does not lower pricing without a confirmed agreement. Final pricing is confirmed after EPM reviews the property.</p></div>';html+='<div id="leadSuccess"></div>';html+=finalQuoteContactForm();html+='<div class="final-quote-box"><strong>Next Step: Final Quote Confirmation</strong><p>Your preliminary beta estimate is complete. Submit it to EPM so we can verify the scope, measurements, accessibility, buildup severity, and final price before service is scheduled.</p></div>';html+='<div class="epm-actions"><button class="epm-action-btn primary" onclick="getFinalQuote(event)">Get My Final Quote</button><a class="epm-action-btn secondary" href="'+EPM_PHONE+'">Call EPM</a><button class="epm-action-btn outline" onclick="requestCallback()">Request Callback</button><button class="epm-action-btn outline" onclick="emailEstimate()">Email My Estimate</button><button class="epm-action-btn outline" onclick="window.print()">Download / Print PDF</button></div>';result.innerHTML=html}
 function getCustomer(){return{name:(document.getElementById("epmCustomerName")||{}).value||"",phone:(document.getElementById("epmCustomerPhone")||{}).value||"",email:(document.getElementById("epmCustomerEmail")||{}).value||"",notes:(document.getElementById("epmNotes")||{}).value||""}}
 function buildLeadPayload(){const data=lastEstimateData||{},m=data.metrics||{},q=lastQuoteData||{};return{
 customer:getCustomer(),
@@ -342,7 +548,7 @@ selectedServices:selectedServiceLabels(),
 serviceFrequencies:selectedFrequencyLines(),
 addOnQuantities:selectedAddOnQuantities(),
 houseWashSides:selectedHouseSides(),
-submittedAt:new Date().toISOString(),
+submittedAt:new Date().toISOString(),preliminaryBeta:true,softwareVersion:"EPM Quote Widget V12.1.1 Stable Measurements Beta",
 estimateText:lastEstimateText,
 quoteSnapshot:{
   version:"EPM Quote Widget V10.2",
@@ -353,8 +559,8 @@ quoteSnapshot:{
   lineItems:q.lines||[]
 }
 }}
-window.getFinalQuote=async function(evt){if(!lastEstimateData||!lastQuoteData){alert("Generate an estimate first.");return}const customer=getCustomer();if(!customer.name.trim()||!customer.phone.trim()){alert("Please enter your full name and phone number so EPM can finalize your quote.");document.getElementById("epmFinalQuoteContact")?.scrollIntoView({behavior:"smooth",block:"center"});return}const btn=evt&&evt.target?evt.target:null;if(btn){btn.disabled=true;btn.textContent="Submitting..."}try{const res=await fetch(EPM_LEAD_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(buildLeadPayload())}),data=await res.json();if(!res.ok)throw new Error(data.error||"Lead submission failed.");document.getElementById("leadSuccess").innerHTML='<div class="epm-success">Your estimate has been submitted to EPM. We will review it and contact you to finalize your quote.</div>'}catch(err){alert(err.message)}finally{if(btn){btn.disabled=false;btn.textContent="Get My Final Quote"}}};
-function buildEstimateText(data,q){const m=data.metrics||{},panes=estimatedPanes(m);let text="EPM Estimated Quote\n\n";text+="Property: "+data.property.formattedAddress+"\n\n";const c=getCustomer();if(c.name||c.phone||c.email||c.notes){text+="Customer\n";if(c.name)text+="Name: "+c.name+"\n";if(c.phone)text+="Phone: "+c.phone+"\n";if(c.email)text+="Email: "+c.email+"\n";if(c.notes)text+="Notes: "+c.notes+"\n";text+="\n"}text+="Itemized EPM Home Profile\n";text+="Stories: "+(m.stories||"")+"\n";text+="Parcel Area: "+(m.parcelAreaSqFt||"")+" sq ft\n";text+="Living Area: "+(m.livingAreaSqFt||"")+" sq ft\n";text+="Lawn Area: "+(m.lawnAreaSqFt||"")+" sq ft\n";text+="Driveway: "+(m.drivewaySqFt||"")+" sq ft\n";text+="Walkway: "+(m.walkwaySqFt||"")+" sq ft\n";text+="Entry / Porch: "+(m.entryPorchSqFt||"")+" sq ft\n";text+="Sidewalk: "+(m.sidewalkSqFt||"")+" sq ft\n";text+="Total Surface: "+(m.totalSurfaceSqFt||"")+" sq ft\n";text+="Fence: "+(m.fenceLinearFt||"")+" linear ft\n";text+="Roof Area: "+(m.roofAreaSqFt||"")+" sq ft\n";text+="Window Panes: "+panes+"\n";const addOnQty=selectedAddOnQuantities();if(selectedServices().includes("bushes"))text+="Bushes Selected: "+addOnQty.bushes+"\n";if(selectedServices().includes("treeLimbs"))text+="Tree Limbs Selected: "+addOnQty.treeLimbs+"\n";if(selectedServices().includes("stainRemoval"))text+="Affected Car Spaces: "+addOnQty.stainSpaces+"\n";text+="\n";text+="Selected Maintenance Schedule\n";selectedFrequencyLines().forEach(function(line){text+="- "+line+"\n"});text+="\nItemized Services\n";q.lines.forEach(function(item){text+="- "+item.name+": "+(item.custom?"Custom Quote":money(item.price))+"\n";item.children.forEach(function(child){text+="   • "+child[0]+": "+child[1]+" = "+child[2]+"\n"})});text+="\nSubtotal: "+money(q.subtotal);text+="\nBundle Discount: "+Math.round((q.discountRate||0)*100)+"%";text+="\nYou Save: "+money(q.savings);text+="\nEstimated Total: "+money(q.total);text+="\n\nFinal pricing is confirmed after EPM reviews the property.";return text}
+window.getFinalQuote=async function(evt){if(!lastEstimateData||!lastQuoteData){alert("Generate an estimate first.");return}const customer=getCustomer();if(!customer.name.trim()||!customer.phone.trim()){alert("Please enter your full name and phone number so EPM can finalize your quote.");document.getElementById("epmFinalQuoteContact")?.scrollIntoView({behavior:"smooth",block:"center"});return}const btn=evt&&evt.target?evt.target:null;if(btn){btn.disabled=true;btn.textContent="Submitting..."}try{const res=await fetch(EPM_LEAD_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(buildLeadPayload())}),data=await res.json();if(!res.ok)throw new Error(data.error||"Lead submission failed.");document.getElementById("leadSuccess").innerHTML='<div class="epm-success">Your preliminary estimate and contact information were saved. EPM will review everything and contact you to confirm the final quote.</div>'}catch(err){alert(err.message)}finally{if(btn){btn.disabled=false;btn.textContent="Get My Final Quote"}}};
+function buildEstimateText(data,q){const m=data.metrics||{},panes=estimatedPanes(m);let text="EPM Preliminary Beta Estimate\n\n";text+="This is not an exact survey or guaranteed final price. EPM verification is required.\n\n";text+="Property: "+data.property.formattedAddress+"\n\n";const c=getCustomer();if(c.name||c.phone||c.email||c.notes){text+="Customer\n";if(c.name)text+="Name: "+c.name+"\n";if(c.phone)text+="Phone: "+c.phone+"\n";if(c.email)text+="Email: "+c.email+"\n";if(c.notes)text+="Notes: "+c.notes+"\n";text+="\n"}text+="Itemized EPM Home Profile\n";text+="Stories: "+(m.stories||"")+"\n";text+="Parcel Area: "+(m.parcelAreaSqFt||"")+" sq ft\n";text+="Living Area: "+(m.livingAreaSqFt||"")+" sq ft\n";text+="Lawn Area: "+(m.lawnAreaSqFt||"")+" sq ft\n";text+="Driveway: "+(m.drivewaySqFt||"")+" sq ft\n";text+="Walkway: "+(m.walkwaySqFt||"")+" sq ft\n";text+="Entry / Porch: "+(m.entryPorchSqFt||"")+" sq ft\n";text+="Sidewalk: "+(m.sidewalkSqFt||"")+" sq ft\n";text+="Total Surface: "+(m.totalSurfaceSqFt||"")+" sq ft\n";text+="Fence: "+(m.fenceLinearFt||"")+" linear ft\n";text+="Roof Area: "+(m.roofAreaSqFt||"")+" sq ft\n";text+="Window Panes: "+panes+"\n";const addOnQty=selectedAddOnQuantities();if(selectedServices().includes("bushes"))text+="Bushes Selected: "+addOnQty.bushes+"\n";if(selectedServices().includes("treeLimbs"))text+="Tree Limbs Selected: "+addOnQty.treeLimbs+"\n";if(selectedServices().includes("stainRemoval"))text+="Affected Car Spaces: "+addOnQty.stainSpaces+"\n";text+="\n";text+="Selected Maintenance Schedule\n";selectedFrequencyLines().forEach(function(line){text+="- "+line+"\n"});text+="\nItemized Services\n";q.lines.forEach(function(item){text+="- "+item.name+": "+(item.custom?"Custom Quote":money(item.price))+"\n";item.children.forEach(function(child){text+="   • "+child[0]+": "+child[1]+" = "+child[2]+"\n"})});text+="\nSubtotal: "+money(q.subtotal);text+="\nBundle Discount: "+Math.round((q.discountRate||0)*100)+"%";text+="\nYou Save: "+money(q.savings);text+="\nPreliminary Estimated Total: "+money(q.total);text+="\n\nFinal pricing is confirmed after EPM reviews the property.";return text}
 window.requestCallback=async function(){const c=getCustomer();if(!c.name.trim()||!c.phone.trim()){alert("Please enter your full name and phone number first.");document.getElementById("epmFinalQuoteContact")?.scrollIntoView({behavior:"smooth",block:"center"});return}try{const payload=buildLeadPayload();payload.callbackOnly=true;const res=await fetch(EPM_LEAD_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}),data=await res.json();if(!res.ok)throw new Error(data.error||"Callback request failed.");document.getElementById("leadSuccess").innerHTML='<div class="epm-success">Callback request submitted. EPM will contact you shortly.</div>'}catch(err){alert(err.message)}};
 window.textEPM=function(){window.location.href="sms:+12818148804?&body="+encodeURIComponent("Hi EPM, I have a question about my property estimate.")};
 window.emailEstimate=function(){if(!lastEstimateText){alert("Generate an estimate first.");return}window.location.href="mailto:?subject="+encodeURIComponent("Your EPM Estimated Quote")+"&body="+encodeURIComponent(lastEstimateText)};

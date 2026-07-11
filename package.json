@@ -1,7 +1,7 @@
 {
   "name": "epm-ai-estimator-backend",
-  "version": "7.1.0",
-  "description": "EPM AI estimator backend using Google aerial imagery, Street View, OpenAI vision, and complete lead storage",
+  "version": "11.1.0",
+  "description": "EPM beta estimator with stable cached measurements and full lead capture",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
