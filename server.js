@@ -23,7 +23,6 @@ const openai = new OpenAI({
 });
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
-const REGRID_TOKEN = process.env.REGRID_TOKEN || "";
 
 const LEADS_DIR = path.join(process.cwd(), "data");
 const LEADS_FILE = path.join(LEADS_DIR, "leads.json");
@@ -96,13 +95,37 @@ function staticMapUrl(lat, lng, zoom = 20, size = "640x640", maptype = "satellit
   return url.toString();
 }
 
-function streetViewUrl(lat, lng, size = "640x640") {
+function metersPerActualPixel(lat, zoom, scale = 2) {
+  const earthCircumference = 40075016.686;
+  const logicalMetersPerPixel =
+    Math.cos((Number(lat) * Math.PI) / 180) *
+    earthCircumference /
+    (256 * Math.pow(2, Number(zoom)));
+
+  return logicalMetersPerPixel / scale;
+}
+
+function imageGroundDimensions(lat, zoom, logicalSize = 640, scale = 2) {
+  const actualPixels = logicalSize * scale;
+  const metersPerPixel = metersPerActualPixel(lat, zoom, scale);
+  const widthMeters = actualPixels * metersPerPixel;
+
+  return {
+    zoom,
+    actualPixels,
+    metersPerPixel,
+    widthMeters,
+    widthFeet: widthMeters * 3.28084
+  };
+}
+
+function streetViewUrl(lat, lng, size = "640x640", heading = 0, fov = 85, pitch = 5) {
   const url = new URL("https://maps.googleapis.com/maps/api/streetview");
   url.searchParams.set("size", size);
   url.searchParams.set("location", `${lat},${lng}`);
-  url.searchParams.set("fov", "80");
-  url.searchParams.set("heading", "0");
-  url.searchParams.set("pitch", "5");
+  url.searchParams.set("fov", String(fov));
+  url.searchParams.set("heading", String(heading));
+  url.searchParams.set("pitch", String(pitch));
   url.searchParams.set("key", GOOGLE_MAPS_API_KEY);
   return url.toString();
 }
@@ -115,361 +138,223 @@ async function getImageAsBase64(url) {
   return buffer.toString("base64");
 }
 
-async function fetchRegridParcel(lat, lng, address = "") {
-  if (!REGRID_TOKEN) {
-    console.error("REGRID_TOKEN is missing from Render environment variables.");
-    return null;
-  }
-
-  const extractFeatures = (data) => {
-    if (Array.isArray(data?.parcels?.features)) return data.parcels.features;
-    if (Array.isArray(data?.features)) return data.features;
-    return [];
-  };
-
-  const runRequest = async (url, label) => {
-    const res = await fetch(url);
-    const responseText = await res.text();
-
-    console.log(`${label} HTTP status:`, res.status);
-
-    if (!res.ok) {
-      console.error(`${label} response:`, responseText);
-      return [];
-    }
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      console.error(`${label} returned invalid JSON:`, responseText);
-      return [];
-    }
-
-    const features = extractFeatures(data);
-    console.log(`${label} feature count:`, features.length);
-    return features;
-  };
-
-  try {
-    console.log("Regrid request coordinates:", { lat, lng });
-
-    // 1. Exact point lookup.
-    const exactUrl = new URL("https://app.regrid.com/api/v2/parcels/point");
-    exactUrl.searchParams.set("token", REGRID_TOKEN);
-    exactUrl.searchParams.set("lat", String(lat));
-    exactUrl.searchParams.set("lon", String(lng));
-    exactUrl.searchParams.set("limit", "1");
-    exactUrl.searchParams.set("return_geometry", "true");
-    exactUrl.searchParams.set("return_matched_buildings", "true");
-
-    let features = await runRequest(exactUrl, "Regrid exact-point lookup");
-
-    // 2. Retry with a small radius because geocoded points can land near
-    // the road, driveway, or parcel edge.
-    if (!features.length) {
-      const radiusUrl = new URL("https://app.regrid.com/api/v2/parcels/point");
-      radiusUrl.searchParams.set("token", REGRID_TOKEN);
-      radiusUrl.searchParams.set("lat", String(lat));
-      radiusUrl.searchParams.set("lon", String(lng));
-      radiusUrl.searchParams.set("radius", "30");
-      radiusUrl.searchParams.set("limit", "10");
-      radiusUrl.searchParams.set("return_geometry", "true");
-      radiusUrl.searchParams.set("return_matched_buildings", "true");
-
-      features = await runRequest(radiusUrl, "Regrid radius lookup");
-    }
-
-    // 3. Address lookup as a final verified Regrid lookup method.
-    if (!features.length && address) {
-      const addressUrl = new URL("https://app.regrid.com/api/v2/parcels/address");
-      addressUrl.searchParams.set("token", REGRID_TOKEN);
-      addressUrl.searchParams.set("query", address);
-      addressUrl.searchParams.set("limit", "5");
-      addressUrl.searchParams.set("return_geometry", "true");
-      addressUrl.searchParams.set("return_matched_buildings", "true");
-
-      features = await runRequest(addressUrl, "Regrid address lookup");
-    }
-
-    const feature = features[0] || null;
-
-    if (!feature) {
-      console.error("Regrid returned no parcel after exact point, radius, and address lookups.");
-      return null;
-    }
-
-    console.log("Regrid parcel headline:", feature.properties?.headline || null);
-    console.log("Regrid geometry type:", feature.geometry?.type || null);
-    console.log("Regrid parcel field keys:", Object.keys(feature.properties?.fields || {}));
-
-    return feature;
-  } catch (error) {
-    console.error("Regrid request error:", error);
-    return null;
-  }
-}
-
-function polygonAreaSqMeters(ring) {
-  const R = 6378137;
-  let area = 0;
-  if (!ring || ring.length < 3) return 0;
-
-  for (let i = 0; i < ring.length; i++) {
-    const p1 = ring[i];
-    const p2 = ring[(i + 1) % ring.length];
-
-    const lon1 = p1[0] * Math.PI / 180;
-    const lon2 = p2[0] * Math.PI / 180;
-    const lat1 = p1[1] * Math.PI / 180;
-    const lat2 = p2[1] * Math.PI / 180;
-
-    area += (lon2 - lon1) * (2 + Math.sin(lat1) + Math.sin(lat2));
-  }
-
-  return Math.abs(area * R * R / 2);
-}
-
-function parcelAreaSqFt(feature) {
-  const geometry = feature?.geometry;
-  if (!geometry) return null;
-
-  try {
-    let sqm = 0;
-    if (geometry.type === "Polygon") {
-      sqm += polygonAreaSqMeters(geometry.coordinates[0]);
-    } else if (geometry.type === "MultiPolygon") {
-      geometry.coordinates.forEach(poly => {
-        sqm += polygonAreaSqMeters(poly[0]);
-      });
-    }
-    return sqm * 10.7639;
-  } catch {
-    return null;
-  }
-}
-
-function propAny(props, keys) {
-  if (!props) return null;
-  const lower = {};
-  Object.keys(props).forEach(k => lower[k.toLowerCase()] = props[k]);
-
-  for (const key of keys) {
-    const value = lower[key.toLowerCase()];
-    if (value !== undefined && value !== null && value !== "" && !Number.isNaN(Number(value))) {
-      return Number(value);
-    }
-  }
-  return null;
-}
-
-function regridFallbackProfile(feature) {
-  if (!feature) {
-    throw new Error(
-      "Unable to verify parcel data. Regrid did not return a usable parcel for this property."
-    );
-  }
-
-  const outerProps = feature?.properties || {};
-  const fieldProps = outerProps?.fields || {};
-  const props = { ...outerProps, ...fieldProps };
-
-  const parcelSqFt =
-    parcelAreaSqFt(feature) ||
-    propAny(props, [
-      "ll_gissqft",
-      "sqft",
-      "gis_sqft",
-      "land_sqft",
-      "lot_sqft",
-      "parcel_sqft"
-    ]);
-
-  if (!parcelSqFt || parcelSqFt <= 0) {
-    throw new Error(
-      "Unable to determine parcel size from the Regrid parcel geometry or fields."
-    );
-  }
-
-  const buildingFootprint = propAny(props, [
-    "ll_bldg_footprint_sqft",
-    "building_footprint_sqft",
-    "bldg_footprint_sqft"
-  ]);
-
-  let livingArea = propAny(props, [
-    "bldg_sqft",
-    "building_sqft",
-    "living_area",
-    "livingarea",
-    "sqft_living",
-    "total_area",
-    "res_area",
-    "impr_sqft",
-    "struct_sqft"
-  ]);
-
-  let stories = propAny(props, [
-    "stories",
-    "num_stories",
-    "story",
-    "bldg_stories"
-  ]);
-
-  if (!stories && livingArea && buildingFootprint) {
-    stories = Math.max(1, Math.round(livingArea / buildingFootprint));
-  }
-
-  if (!stories) {
-    stories = 1;
-  }
-
-  stories = stories >= 2 ? 2 : 1;
-
-  // If Regrid supplies a real building footprint but no living-area field,
-  // derive a working living area from the verified footprint and story count.
-  if (!livingArea && buildingFootprint) {
-    livingArea = buildingFootprint * stories;
-  }
-
-  if (!buildingFootprint && !livingArea) {
-    throw new Error(
-      "Regrid returned the parcel, but no usable building footprint or building-size field was available."
-    );
-  }
-
-  const footprint = buildingFootprint || (livingArea / stories);
-
-  // These surface values are only starting references for AI image analysis.
-  const driveway = clamp(parcelSqFt * 0.055, 250, 900);
-  const walkway = clamp(parcelSqFt * 0.010, 40, 180);
-  const entry = clamp(parcelSqFt * 0.006, 20, 100);
-  const sidewalk = clamp(Math.sqrt(parcelSqFt) * 1.9, 80, 320);
-  const totalSurface = driveway + walkway + entry + sidewalk;
-  const fence = clamp(Math.sqrt(parcelSqFt) * 2.25, 100, 400);
-  const roofArea = footprint * 1.22;
-
-  const preliminaryLawnArea =
-    parcelSqFt -
-    footprint -
-    totalSurface;
-
-  if (preliminaryLawnArea <= 0 || preliminaryLawnArea >= parcelSqFt) {
-    throw new Error(
-      "The verified parcel and building data produced an implausible preliminary lawn area."
-    );
-  }
-
-  return {
-    parcelAreaSqFt: roundTo(parcelSqFt, 25),
-    buildingFootprintSqFt: roundTo(footprint, 25),
-    livingAreaSqFt: roundTo(livingArea || footprint, 25),
-    stories,
-    lawnAreaSqFt: roundTo(preliminaryLawnArea, 25),
-    drivewaySqFt: roundTo(driveway, 10),
-    walkwaySqFt: roundTo(walkway, 5),
-    entryPorchSqFt: roundTo(entry, 5),
-    sidewalkSqFt: roundTo(sidewalk, 5),
-    totalSurfaceSqFt: roundTo(totalSurface, 10),
-    fenceLinearFt: roundTo(fence, 5),
-    roofAreaSqFt: roundTo(roofArea, 25),
-    windowCount: stories === 2 ? 22 : 14,
-    confidence: "medium",
-    source: "Verified Regrid parcel geometry + Regrid building data + AI image analysis",
-    measurementStatus: "verified_parcel"
-  };
-}
-
-async function aiAnalyzeImages({ satelliteBase64, streetBase64, address, lat, lng, fallbackProfile }) {
+async function aiAnalyzeImages({
+  wideSatelliteBase64,
+  closeSatelliteBase64,
+  streetImages,
+  address,
+  lat,
+  lng,
+  wideScale,
+  closeScale
+}) {
   const prompt = `
 You are EPM's exterior property estimating assistant.
 
-Analyze the satellite image and street view image for:
+Analyze the supplied Google aerial and Street View images for:
 ${address}
 Coordinates: ${lat}, ${lng}
 
-Goal:
-Estimate practical working measurements for EPM exterior property maintenance quotes.
+IMAGE SCALE INFORMATION
+Wide aerial image:
+- Zoom: ${wideScale.zoom}
+- Image width: approximately ${wideScale.widthFeet.toFixed(1)} feet
+- Actual image width: ${wideScale.actualPixels} pixels
+- Approximate scale: ${(wideScale.widthFeet / wideScale.actualPixels).toFixed(4)} feet per pixel
 
-Return ONLY valid JSON with this exact schema:
+Close aerial image:
+- Zoom: ${closeScale.zoom}
+- Image width: approximately ${closeScale.widthFeet.toFixed(1)} feet
+- Actual image width: ${closeScale.actualPixels} pixels
+- Approximate scale: ${(closeScale.widthFeet / closeScale.actualPixels).toFixed(4)} feet per pixel
+
+The geocoded point is centered on or near the property. Use visible fences, lot lines,
+neighboring structures, street frontage, driveway placement, roof edges, and yard boundaries
+to identify the most likely subject property. Do not combine neighboring properties.
+
+Return ONLY valid JSON using this exact schema:
 {
-  "propertyType": "single_family_residential | townhouse | unknown",
+  "propertyType": "single_family_residential | townhouse | duplex | unknown",
   "stories": number,
   "parcelAreaSqFt": number,
+  "buildingFootprintSqFt": number,
   "livingAreaSqFt": number,
   "lawnAreaSqFt": number,
   "drivewaySqFt": number,
   "walkwaySqFt": number,
   "entryPorchSqFt": number,
   "sidewalkSqFt": number,
+  "patioDeckPoolOtherSqFt": number,
   "totalSurfaceSqFt": number,
   "fenceLinearFt": number,
   "roofAreaSqFt": number,
   "windowCount": number,
   "confidence": "low | medium | high",
-  "measurementNotes": string[]
+  "confidenceScore": number,
+  "measurementNotes": string[],
+  "uncertaintyReasons": string[]
 }
 
-Verified Regrid parcel and building reference data:
-${JSON.stringify(fallbackProfile, null, 2)}
+MEASUREMENT RULES
+1. Estimate each property independently from the images. Never reuse a generic lot or lawn size.
+2. Use the wide aerial image to identify the likely parcel boundaries and overall lot.
+3. Use the close aerial image to measure roof, grass, driveway, walkways, porch, patio, pool,
+   deck, sheds, landscaping beds, and other non-mowable areas.
+4. Use Street View to estimate stories, visible windows, garage width, driveway width,
+   front-yard proportions, and entry/walkway layout.
+5. Use the provided image scale to convert visible pixel proportions into approximate feet
+   and square feet.
+6. Lawn area means mowable grass only. Do not count the house, roof, driveway, sidewalk,
+   walkway, porch, patio, deck, pool, sheds, gravel, or landscaping beds.
+7. Parcel area is the estimated total subject lot area, including the house and yard.
+8. Building footprint means ground coverage, not total living area.
+9. For a multi-story home, living area may be larger than the building footprint.
+10. totalSurfaceSqFt must equal drivewaySqFt + walkwaySqFt + entryPorchSqFt + sidewalkSqFt.
+11. parcelAreaSqFt should approximately equal:
+    buildingFootprintSqFt + lawnAreaSqFt + drivewaySqFt + walkwaySqFt +
+    entryPorchSqFt + sidewalkSqFt + patioDeckPoolOtherSqFt.
+    Small differences are acceptable for landscaping beds and uncertainty.
+12. Do not force a confident answer when boundaries are unclear. Use low confidence and explain why.
+13. Use one practical working estimate for each metric, not a range.
+14. Do not claim survey-grade accuracy.
+15. confidenceScore must be an integer from 0 to 100.
 
-The parcelAreaSqFt value above is authoritative and must not be changed.
-Use the images to refine lawn, driveway, walkway, porch, sidewalk, fence,
-roof, window, and story estimates. Do not simply copy the preliminary lawn
-or surface estimates when the visible imagery supports a different result.
-
-Rules:
-- Use one solid number for each metric, not a range.
-- Total surface must equal driveway + walkway + entryPorch + sidewalk.
-- Use the satellite image primarily for lawn, concrete, roof, and fence.
-- Use street view primarily for stories, front windows, garage/driveway context, and visible entry/walkway.
-- Be conservative but practical for quoting.
-- If an image-derived area is unclear, use the verified Regrid parcel/building references cautiously and set confidence to low or medium.
-- Do not claim exactness. These are working estimates.
+SANITY GUIDANCE
+- All areas must be positive or zero.
+- No individual area can exceed parcelAreaSqFt.
+- Lawn area must be less than parcelAreaSqFt.
+- Building footprint must be less than parcelAreaSqFt.
+- Roof area should be reasonably related to building footprint.
+- Window count should be a whole-number estimate of exterior panes/windows visible or inferred.
 `;
 
+  const imageContent = [
+    { type: "text", text: prompt },
+    {
+      type: "image_url",
+      image_url: {
+        url: `data:image/png;base64,${wideSatelliteBase64}`,
+        detail: "high"
+      }
+    },
+    {
+      type: "image_url",
+      image_url: {
+        url: `data:image/png;base64,${closeSatelliteBase64}`,
+        detail: "high"
+      }
+    }
+  ];
+
+  for (const street of streetImages) {
+    imageContent.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/png;base64,${street.base64}`,
+        detail: "high"
+      }
+    });
+  }
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
     messages: [
       {
         role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: `data:image/png;base64,${satelliteBase64}` } },
-          { type: "image_url", image_url: { url: `data:image/png;base64,${streetBase64}` } }
-        ]
+        content: imageContent
       }
     ],
     response_format: { type: "json_object" },
-    temperature: 0.2
+    temperature: 0.1
   });
 
   const text = response.choices[0]?.message?.content || "{}";
   const parsed = JSON.parse(text);
 
-  const totalSurface =
-    Number(parsed.drivewaySqFt || 0) +
-    Number(parsed.walkwaySqFt || 0) +
-    Number(parsed.entryPorchSqFt || 0) +
-    Number(parsed.sidewalkSqFt || 0);
+  const requiredNumericFields = [
+    "stories",
+    "parcelAreaSqFt",
+    "buildingFootprintSqFt",
+    "livingAreaSqFt",
+    "lawnAreaSqFt",
+    "drivewaySqFt",
+    "walkwaySqFt",
+    "entryPorchSqFt",
+    "sidewalkSqFt",
+    "patioDeckPoolOtherSqFt",
+    "fenceLinearFt",
+    "roofAreaSqFt",
+    "windowCount",
+    "confidenceScore"
+  ];
+
+  for (const field of requiredNumericFields) {
+    if (!Number.isFinite(Number(parsed[field]))) {
+      throw new Error(`OpenAI did not return a usable ${field} measurement.`);
+    }
+  }
+
+  const parcel = Number(parsed.parcelAreaSqFt);
+  const footprint = Number(parsed.buildingFootprintSqFt);
+  const lawn = Number(parsed.lawnAreaSqFt);
+  const driveway = Number(parsed.drivewaySqFt);
+  const walkway = Number(parsed.walkwaySqFt);
+  const entry = Number(parsed.entryPorchSqFt);
+  const sidewalk = Number(parsed.sidewalkSqFt);
+  const other = Number(parsed.patioDeckPoolOtherSqFt);
+  const totalSurface = driveway + walkway + entry + sidewalk;
+
+  if (parcel <= 0 || parcel > 250000) {
+    throw new Error("OpenAI returned an implausible parcel-area estimate.");
+  }
+
+  if (footprint <= 0 || footprint >= parcel) {
+    throw new Error("OpenAI returned an implausible building-footprint estimate.");
+  }
+
+  if (lawn < 0 || lawn >= parcel) {
+    throw new Error("OpenAI returned an implausible lawn-area estimate.");
+  }
+
+  const accountedArea =
+    footprint + lawn + driveway + walkway + entry + sidewalk + other;
+
+  const areaDifferenceRatio = Math.abs(accountedArea - parcel) / parcel;
+
+  const notes = Array.isArray(parsed.measurementNotes)
+    ? parsed.measurementNotes
+    : [];
+
+  if (areaDifferenceRatio > 0.30) {
+    notes.push(
+      `Area consistency warning: visible sections differ from the estimated parcel by ${Math.round(areaDifferenceRatio * 100)}%.`
+    );
+  }
 
   return {
     propertyType: parsed.propertyType || "unknown",
-    stories: Number(parsed.stories || fallbackProfile.stories || 1),
-    parcelAreaSqFt: roundTo(Number(fallbackProfile.parcelAreaSqFt), 25),
-    livingAreaSqFt: roundTo(Number(parsed.livingAreaSqFt || fallbackProfile.livingAreaSqFt), 25),
-    lawnAreaSqFt: roundTo(Number(parsed.lawnAreaSqFt || fallbackProfile.lawnAreaSqFt), 25),
-    drivewaySqFt: roundTo(Number(parsed.drivewaySqFt || fallbackProfile.drivewaySqFt), 10),
-    walkwaySqFt: roundTo(Number(parsed.walkwaySqFt || fallbackProfile.walkwaySqFt), 5),
-    entryPorchSqFt: roundTo(Number(parsed.entryPorchSqFt || fallbackProfile.entryPorchSqFt), 5),
-    sidewalkSqFt: roundTo(Number(parsed.sidewalkSqFt || fallbackProfile.sidewalkSqFt), 5),
-    totalSurfaceSqFt: roundTo(totalSurface || fallbackProfile.totalSurfaceSqFt, 10),
-    fenceLinearFt: roundTo(Number(parsed.fenceLinearFt || fallbackProfile.fenceLinearFt), 5),
-    roofAreaSqFt: roundTo(Number(parsed.roofAreaSqFt || fallbackProfile.roofAreaSqFt), 25),
-    windowCount: Math.round(Number(parsed.windowCount || fallbackProfile.windowCount || 20)),
-    confidence: parsed.confidence || fallbackProfile.confidence || "medium",
-    measurementNotes: Array.isArray(parsed.measurementNotes) ? parsed.measurementNotes : [],
-    source: "Verified Regrid parcel + Google Satellite + Google Street View + AI Vision"
+    stories: Math.max(1, Math.round(Number(parsed.stories))),
+    parcelAreaSqFt: roundTo(parcel, 25),
+    buildingFootprintSqFt: roundTo(footprint, 25),
+    livingAreaSqFt: roundTo(Number(parsed.livingAreaSqFt), 25),
+    lawnAreaSqFt: roundTo(lawn, 25),
+    drivewaySqFt: roundTo(driveway, 10),
+    walkwaySqFt: roundTo(walkway, 5),
+    entryPorchSqFt: roundTo(entry, 5),
+    sidewalkSqFt: roundTo(sidewalk, 5),
+    patioDeckPoolOtherSqFt: roundTo(other, 10),
+    totalSurfaceSqFt: roundTo(totalSurface, 10),
+    fenceLinearFt: roundTo(Number(parsed.fenceLinearFt), 5),
+    roofAreaSqFt: roundTo(Number(parsed.roofAreaSqFt), 25),
+    windowCount: Math.max(0, Math.round(Number(parsed.windowCount))),
+    confidence: parsed.confidence || "low",
+    confidenceScore: clamp(Math.round(Number(parsed.confidenceScore)), 0, 100),
+    measurementNotes: notes,
+    uncertaintyReasons: Array.isArray(parsed.uncertaintyReasons)
+      ? parsed.uncertaintyReasons
+      : [],
+    source: "Google aerial imagery + Google Street View + OpenAI vision",
+    measurementStatus: "ai_visual_estimate"
   };
 }
 
@@ -633,10 +518,20 @@ app.get("/", (req, res) => {
   res.json({
     ok: true,
     name: "EPM AI Estimator Backend",
-    version: "5.0-leads",
-    endpoints: ["/api/estimate", "/api/property-image", "/api/leads", "/admin"]
+    version: "7.1-openai-only",
+    endpoints: ["/api/estimate", "/api/leads", "/admin"]
   });
 });
+
+app.get("/api/version", (req, res) => {
+  res.json({
+    ok: true,
+    version: "7.1-openai-only",
+    regridUsed: false,
+    measurementSource: "Google aerial + Google Street View + OpenAI vision"
+  });
+});
+
 
 app.get("/admin", (req, res) => {
   if (!leadMatchesAdminKey(req)) {
@@ -926,14 +821,14 @@ app.post("/api/leads", async (req, res) => {
 
 app.get("/api/property-image", async (req, res) => {
   try {
-    const { type, lat, lng } = req.query;
+    const { type, lat, lng, zoom, heading } = req.query;
 
     if (!lat || !lng) return res.status(400).send("Missing lat/lng");
 
     const imageUrl =
       type === "street"
-        ? streetViewUrl(lat, lng, "640x640")
-        : staticMapUrl(lat, lng, 20, "640x640", "satellite");
+        ? streetViewUrl(lat, lng, "640x640", Number(heading || 0), 90, 5)
+        : staticMapUrl(lat, lng, Number(zoom || 20), "640x640", "satellite");
 
     const imageRes = await fetch(imageUrl);
     if (!imageRes.ok) return res.status(imageRes.status).send("Image fetch failed");
@@ -966,24 +861,52 @@ app.post("/api/estimate", async (req, res) => {
       return res.status(400).json({ error: "Address is required." });
     }
 
-    const satelliteUrl = staticMapUrl(property.lat, property.lng, 20);
-    const streetUrl = streetViewUrl(property.lat, property.lng);
+    const wideZoom = 19;
+    const closeZoom = 21;
 
-    const [satelliteBase64, streetBase64, regridFeature] = await Promise.all([
-      getImageAsBase64(satelliteUrl),
-      getImageAsBase64(streetUrl),
-      fetchRegridParcel(property.lat, property.lng, property.formattedAddress)
+    const wideSatelliteUrl = staticMapUrl(
+      property.lat,
+      property.lng,
+      wideZoom,
+      "640x640",
+      "satellite"
+    );
+
+    const closeSatelliteUrl = staticMapUrl(
+      property.lat,
+      property.lng,
+      closeZoom,
+      "640x640",
+      "satellite"
+    );
+
+    const streetHeadings = [0, 90, 180, 270];
+    const streetUrls = streetHeadings.map(heading =>
+      streetViewUrl(property.lat, property.lng, "640x640", heading, 90, 5)
+    );
+
+    const imageResults = await Promise.all([
+      getImageAsBase64(wideSatelliteUrl),
+      getImageAsBase64(closeSatelliteUrl),
+      ...streetUrls.map(getImageAsBase64)
     ]);
 
-    const fallbackProfile = regridFallbackProfile(regridFeature);
+    const wideSatelliteBase64 = imageResults[0];
+    const closeSatelliteBase64 = imageResults[1];
+    const streetImages = streetHeadings.map((heading, index) => ({
+      heading,
+      base64: imageResults[index + 2]
+    }));
 
     const metrics = await aiAnalyzeImages({
-      satelliteBase64,
-      streetBase64,
+      wideSatelliteBase64,
+      closeSatelliteBase64,
+      streetImages,
       address: property.formattedAddress,
       lat: property.lat,
       lng: property.lng,
-      fallbackProfile
+      wideScale: imageGroundDimensions(property.lat, wideZoom),
+      closeScale: imageGroundDimensions(property.lat, closeZoom)
     });
 
     const quote = quoteFromMetrics(metrics, services);
@@ -991,18 +914,18 @@ app.post("/api/estimate", async (req, res) => {
     res.json({
       property,
       images: {
-        satellite: `/api/property-image?type=satellite&lat=${property.lat}&lng=${property.lng}`,
-        street: `/api/property-image?type=street&lat=${property.lat}&lng=${property.lng}`
+        satellite: `/api/property-image?type=satellite&zoom=20&lat=${property.lat}&lng=${property.lng}`,
+        street: `/api/property-image?type=street&heading=0&lat=${property.lat}&lng=${property.lng}`
       },
-      regridFound: Boolean(regridFeature),
       measurementDebug: {
-        regridFound: Boolean(regridFeature),
-        parcelSource: regridFeature ? "Regrid parcel" : "No verified parcel",
-        fallbackUsed: false
+        source: "OpenAI visual analysis only",
+        regridUsed: false,
+        aerialZoomLevels: [wideZoom, closeZoom],
+        streetViewHeadings: streetHeadings
       },
       metrics,
       quote,
-      disclaimer: "This is a working AI estimate based on verified parcel data, imagery, and property records. Final pricing is confirmed after EPM reviews the property."
+      disclaimer: "This is an AI-assisted visual estimate based on Google aerial and Street View imagery. It is not a survey or exact measurement. Final measurements and pricing are confirmed by EPM before service."
     });
   } catch (error) {
     console.error(error);
@@ -1011,5 +934,5 @@ app.post("/api/estimate", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`EPM AI Estimator Backend running on port ${PORT}`);
+  console.log(`EPM AI Estimator Backend V7.1 OPENAI-ONLY running on port ${PORT}`);
 });

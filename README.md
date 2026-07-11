@@ -1,49 +1,71 @@
-# EPM Backend — Regrid Response Parsing Fix
+# EPM Backend V7 — OpenAI Visual Estimator
 
-This version fixes the real Regrid problem shown in Render logs.
+This version removes Regrid completely.
 
-## Root cause
+## Measurement sources
 
-Regrid API v2 returns U.S. parcel features under:
+The estimator now uses:
 
-`response.parcels.features`
+- Google Geocoding
+- Two Google aerial-image zoom levels
+- Four Google Street View directions
+- OpenAI vision analysis
+- Known image scale calculated from latitude and map zoom
 
-The previous backend only checked:
+It does not read or require `REGRID_TOKEN`.
 
-`response.features`
+## Required Render environment variables
 
-That made a successful HTTP 200 response look like it contained zero parcels.
+Keep:
 
-Regrid's standardized fields are also nested under:
+- `OPENAI_API_KEY`
+- `GOOGLE_MAPS_API_KEY`
+- `EMAIL_USER`
+- `EMAIL_PASS`
+- `LEAD_EMAIL_TO`
 
-`feature.properties.fields`
+Optional:
 
-The previous code mostly checked only `feature.properties`.
+- `OPENAI_VISION_MODEL` — defaults to `gpt-4o-mini`
+- `ALLOWED_ORIGIN`
+- `ADMIN_KEY`
+- `ADMIN_TIMEZONE`
 
-## What this version changes
-
-- Reads `data.parcels.features` correctly
-- Still supports direct `data.features` responses
-- Reads nested `feature.properties.fields`
-- Retries with a 30-meter radius when an exact point misses
-- Falls back to Regrid's address endpoint, not invented measurements
-- Uses real Regrid parcel geometry for parcel square footage
-- Uses matched building footprint data when available
-- Keeps the hardcoded 7,200 sq ft fallback removed
-- Locks parcel area so AI cannot overwrite verified Regrid geometry
+You may delete `REGRID_TOKEN` from Render because this version does not use it.
 
 ## Install
 
 1. Extract this ZIP.
-2. Replace `server.js` in the GitHub repository.
-3. Commit the change.
-4. Wait for Render to redeploy and show Live.
-5. Test several properties.
-6. Review Render logs.
+2. Replace `server.js` and `package.json` in GitHub.
+3. Commit the changes.
+4. Wait for Render to redeploy and show `Live`.
+5. Replace the Wix embed with the included OpenAI-only widget file.
+6. Test at least five visibly different properties.
 
-Expected logs now include:
+## Important accuracy note
 
-- `Regrid exact-point lookup feature count: 1`
-- Parcel headline
-- Geometry type
-- Regrid parcel field keys
+These are visual working estimates, not parcel-record or survey measurements. The system uses image scale and multiple views to improve consistency, but EPM should still verify final scope and price.
+
+## Lead dashboard
+
+Open:
+
+`https://epm-ai-estimator.onrender.com/admin`
+
+If you configured `ADMIN_KEY`, use:
+
+`https://epm-ai-estimator.onrender.com/admin?key=YOUR_ADMIN_KEY`
+
+
+## Verification after deployment
+
+Open these URLs after Render says Live:
+
+- `https://epm-ai-estimator.onrender.com/`
+- `https://epm-ai-estimator.onrender.com/api/version`
+
+Both must say:
+
+`7.1-openai-only`
+
+If they do not, Render is still deploying the old GitHub code or the wrong repository/branch.

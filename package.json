@@ -1,7 +1,7 @@
 {
   "name": "epm-ai-estimator-backend",
-  "version": "5.0.0",
-  "description": "EPM AI estimator backend with free lead capture and optional Gmail email notifications",
+  "version": "7.1.0",
+  "description": "EPM AI estimator backend using Google aerial imagery, Street View, OpenAI vision, and complete lead storage",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
