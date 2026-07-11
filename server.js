@@ -116,7 +116,10 @@ async function getImageAsBase64(url) {
 }
 
 async function fetchRegridParcel(lat, lng) {
-  if (!REGRID_TOKEN) return null;
+  if (!REGRID_TOKEN) {
+    console.error("REGRID_TOKEN is missing from Render environment variables.");
+    return null;
+  }
 
   try {
     const url = new URL("https://app.regrid.com/api/v2/parcels/point");
@@ -126,11 +129,39 @@ async function fetchRegridParcel(lat, lng) {
     url.searchParams.set("limit", "1");
 
     const res = await fetch(url);
-    if (!res.ok) return null;
+    const responseText = await res.text();
 
-    const data = await res.json();
-    return data?.features?.[0] || null;
-  } catch {
+    console.log("Regrid request coordinates:", { lat, lng });
+    console.log("Regrid HTTP status:", res.status);
+
+    if (!res.ok) {
+      console.error("Regrid response:", responseText);
+      return null;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Regrid returned invalid JSON:", responseText);
+      return null;
+    }
+
+    console.log("Regrid feature count:", data?.features?.length || 0);
+
+    const feature = data?.features?.[0] || null;
+
+    if (!feature) {
+      console.error("Regrid returned no parcel feature for these coordinates.");
+      return null;
+    }
+
+    console.log("Regrid parcel properties:", feature.properties || {});
+    console.log("Regrid geometry type:", feature.geometry?.type || null);
+
+    return feature;
+  } catch (error) {
+    console.error("Regrid request error:", error);
     return null;
   }
 }
@@ -189,11 +220,29 @@ function propAny(props, keys) {
 }
 
 function regridFallbackProfile(feature) {
+  if (!feature) {
+    throw new Error(
+      "Unable to verify parcel data. Regrid did not return a usable parcel for this property."
+    );
+  }
+
   const props = feature?.properties || {};
+
   const parcelSqFt =
     parcelAreaSqFt(feature) ||
-    propAny(props, ["ll_gissqft", "gis_sqft", "land_sqft", "lot_sqft", "parcel_sqft"]) ||
-    7200;
+    propAny(props, [
+      "ll_gissqft",
+      "gis_sqft",
+      "land_sqft",
+      "lot_sqft",
+      "parcel_sqft"
+    ]);
+
+  if (!parcelSqFt || parcelSqFt <= 0) {
+    throw new Error(
+      "Unable to determine parcel size from the Regrid response."
+    );
+  }
 
   let livingArea = propAny(props, [
     "bldg_sqft",
@@ -207,13 +256,24 @@ function regridFallbackProfile(feature) {
     "struct_sqft"
   ]);
 
-  if (!livingArea) {
-    livingArea = clamp(parcelSqFt * 0.30, 1450, 3600);
+  let stories = propAny(props, [
+    "stories",
+    "num_stories",
+    "story",
+    "bldg_stories"
+  ]);
+
+  if (!stories && livingArea) {
+    stories = livingArea > 2100 ? 2 : 1;
   }
 
-  let stories = propAny(props, ["stories", "num_stories", "story", "bldg_stories"]);
-  if (!stories) stories = livingArea > 2100 ? 2 : 1;
-  stories = stories >= 2 ? 2 : 1;
+  stories = stories && stories >= 2 ? 2 : 1;
+
+  if (!livingArea) {
+    throw new Error(
+      "Regrid returned a parcel, but no usable building-size data was found."
+    );
+  }
 
   const footprint = livingArea / stories;
 
@@ -224,7 +284,17 @@ function regridFallbackProfile(feature) {
   const totalSurface = driveway + walkway + entry + sidewalk;
   const fence = clamp(Math.sqrt(parcelSqFt) * 2.25, 145, 310);
   const roofArea = livingArea * (stories === 2 ? 1.10 : 1.25);
-  const lawnArea = Math.max(850, parcelSqFt - footprint - totalSurface - 850);
+
+  const lawnArea =
+    parcelSqFt -
+    footprint -
+    totalSurface;
+
+  if (lawnArea <= 0 || lawnArea >= parcelSqFt) {
+    throw new Error(
+      "Calculated lawn area was not plausible for this parcel."
+    );
+  }
 
   return {
     parcelAreaSqFt: roundTo(parcelSqFt, 25),
@@ -240,7 +310,8 @@ function regridFallbackProfile(feature) {
     roofAreaSqFt: roundTo(roofArea, 25),
     windowCount: stories === 2 ? 22 : 14,
     confidence: "medium",
-    source: feature ? "Regrid parcel + EPM formulas" : "EPM formulas"
+    source: "Regrid parcel + EPM formulas",
+    measurementStatus: "verified_parcel"
   };
 }
 
@@ -356,6 +427,41 @@ function quoteFromMetrics(metrics, services) {
   };
 }
 
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function moneyDisplay(value) {
+  return "$" + Math.round(Number(value || 0)).toLocaleString();
+}
+
+function formatSubmittedDate(value) {
+  try {
+    return new Date(value).toLocaleString("en-US", {
+      timeZone: process.env.ADMIN_TIMEZONE || "America/Chicago",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  } catch {
+    return value || "";
+  }
+}
+
+function leadMatchesAdminKey(req) {
+  const required = process.env.ADMIN_KEY;
+  if (!required) return true;
+  return req.query.key === required;
+}
+
 function leadToText(lead) {
   const q = lead.quote || {};
   const m = lead.metrics || {};
@@ -395,6 +501,23 @@ function leadToText(lead) {
   (lead.selectedServices || []).forEach(item => {
     text += `- ${item}\n`;
   });
+
+  text += "\nMaintenance Schedule\n";
+  (lead.serviceFrequencies || []).forEach(item => {
+    text += `- ${item}\n`;
+  });
+
+  if (lead.houseWashSides?.length) {
+    text += `\nHouse Wash Sides: ${lead.houseWashSides.join(", ")}\n`;
+  }
+
+  const quantities = lead.addOnQuantities || {};
+  if (Object.keys(quantities).length) {
+    text += "\nAdd-On Quantities\n";
+    text += `- Bushes: ${quantities.bushes || 0}\n`;
+    text += `- Tree Limbs: ${quantities.treeLimbs || 0}\n`;
+    text += `- Affected Car Spaces: ${quantities.stainSpaces || 0}\n`;
+  }
 
   text += "\nItemized Quote\n";
   (q.lines || []).forEach(line => {
@@ -446,68 +569,267 @@ app.get("/", (req, res) => {
 });
 
 app.get("/admin", (req, res) => {
-  const leads = readLeads();
+  if (!leadMatchesAdminKey(req)) {
+    return res.status(401).send("Unauthorized. Add ?key=YOUR_ADMIN_KEY to the URL.");
+  }
 
-  const rows = leads.map(lead => {
+  const leads = readLeads();
+  const adminKeyQuery = process.env.ADMIN_KEY ? `?key=${encodeURIComponent(process.env.ADMIN_KEY)}` : "";
+
+  const cards = leads.map((lead, index) => {
     const customer = lead.customer || {};
     const property = lead.property || {};
-    const q = lead.quote || {};
+    const metrics = lead.metrics || {};
+    const quote = lead.quote || lead.quoteSnapshot || {};
+    const lines = quote.lines || quote.lineItems || [];
+    const frequencies = lead.serviceFrequencies || [];
+    const selectedServices = lead.selectedServices || [];
+    const quantities = lead.addOnQuantities || {};
+    const images = lead.images || {};
+
+    const servicesHtml = selectedServices.length
+      ? selectedServices.map(item => `<li>${escapeHtml(item)}</li>`).join("")
+      : "<li>No services recorded</li>";
+
+    const frequencyHtml = frequencies.length
+      ? frequencies.map(item => `<li>${escapeHtml(item)}</li>`).join("")
+      : "<li>One-time / no schedule recorded</li>";
+
+    const lineItemsHtml = lines.length
+      ? lines.map(line => {
+          const children = (line.children || []).map(child => `
+            <tr>
+              <td class="indent">${escapeHtml(child[0])}</td>
+              <td>${escapeHtml(child[1])}</td>
+              <td class="amount">${escapeHtml(child[2])}</td>
+            </tr>
+          `).join("");
+
+          return `
+            <tr class="service-row">
+              <td><strong>${escapeHtml(line.name)}</strong></td>
+              <td>${line.custom ? "Custom Quote" : "Estimated service price"}</td>
+              <td class="amount"><strong>${line.custom ? "Custom Quote" : moneyDisplay(line.price)}</strong></td>
+            </tr>
+            ${children}
+          `;
+        }).join("")
+      : `<tr><td colspan="3">No quote line items were stored.</td></tr>`;
+
+    const satelliteUrl = images.satellite
+      ? (String(images.satellite).startsWith("http") ? images.satellite : `${req.protocol}://${req.get("host")}${images.satellite}`)
+      : "";
+    const streetUrl = images.street
+      ? (String(images.street).startsWith("http") ? images.street : `${req.protocol}://${req.get("host")}${images.street}`)
+      : "";
+
     return `
-      <tr>
-        <td>${lead.createdAt || ""}</td>
-        <td>${customer.name || ""}</td>
-        <td>${customer.phone || ""}</td>
-        <td>${customer.email || ""}</td>
-        <td>${property.formattedAddress || ""}</td>
-        <td>$${q.total || 0}</td>
-      </tr>
+      <details class="lead-card" ${index === 0 ? "open" : ""}>
+        <summary>
+          <div>
+            <span class="status-pill">${lead.callbackOnly ? "Callback Request" : "Final Quote Request"}</span>
+            <h2>${escapeHtml(customer.name || "Unnamed Lead")}</h2>
+            <p>${escapeHtml(property.formattedAddress || "No property address")}</p>
+          </div>
+          <div class="summary-right">
+            <strong>${moneyDisplay(quote.total)}</strong>
+            <span>${escapeHtml(formatSubmittedDate(lead.createdAt || lead.submittedAt))}</span>
+          </div>
+        </summary>
+
+        <div class="lead-body">
+          <section>
+            <h3>Customer</h3>
+            <div class="facts">
+              <div><span>Name</span><strong>${escapeHtml(customer.name)}</strong></div>
+              <div><span>Phone</span><strong><a href="tel:${escapeHtml(customer.phone)}">${escapeHtml(customer.phone)}</a></strong></div>
+              <div><span>Email</span><strong><a href="mailto:${escapeHtml(customer.email)}">${escapeHtml(customer.email)}</a></strong></div>
+              <div><span>Lead ID</span><strong>${escapeHtml(lead.id)}</strong></div>
+            </div>
+            ${customer.notes ? `<div class="notes"><strong>Customer notes</strong><p>${escapeHtml(customer.notes)}</p></div>` : ""}
+          </section>
+
+          <section>
+            <h3>Property</h3>
+            <div class="facts">
+              <div><span>Address</span><strong>${escapeHtml(property.formattedAddress)}</strong></div>
+              <div><span>Stories</span><strong>${escapeHtml(metrics.stories)}</strong></div>
+              <div><span>Living Area</span><strong>${escapeHtml(metrics.livingAreaSqFt)} sq ft</strong></div>
+              <div><span>Parcel Area</span><strong>${escapeHtml(metrics.parcelAreaSqFt)} sq ft</strong></div>
+              <div><span>Lawn</span><strong>${escapeHtml(metrics.lawnAreaSqFt)} sq ft</strong></div>
+              <div><span>Total Surface</span><strong>${escapeHtml(metrics.totalSurfaceSqFt)} sq ft</strong></div>
+              <div><span>Roof</span><strong>${escapeHtml(metrics.roofAreaSqFt)} sq ft</strong></div>
+              <div><span>Fence</span><strong>${escapeHtml(metrics.fenceLinearFt)} linear ft</strong></div>
+              <div><span>Window Panes</span><strong>${escapeHtml(lead.windowPanes)}</strong></div>
+            </div>
+          </section>
+
+          ${(satelliteUrl || streetUrl) ? `
+          <section>
+            <h3>Property Views</h3>
+            <div class="image-grid">
+              ${satelliteUrl ? `<div><span>Aerial View</span><img src="${escapeHtml(satelliteUrl)}" alt="Aerial property view"></div>` : ""}
+              ${streetUrl ? `<div><span>Street View</span><img src="${escapeHtml(streetUrl)}" alt="Street property view"></div>` : ""}
+            </div>
+          </section>` : ""}
+
+          <section class="two-column">
+            <div>
+              <h3>Selected Services</h3>
+              <ul>${servicesHtml}</ul>
+            </div>
+            <div>
+              <h3>Maintenance Schedule</h3>
+              <ul>${frequencyHtml}</ul>
+            </div>
+          </section>
+
+          <section>
+            <h3>Add-On Quantities</h3>
+            <div class="facts">
+              <div><span>Bushes</span><strong>${escapeHtml(quantities.bushes || 0)}</strong></div>
+              <div><span>Low Tree Limbs</span><strong>${escapeHtml(quantities.treeLimbs || 0)}</strong></div>
+              <div><span>Affected Car Spaces</span><strong>${escapeHtml(quantities.stainSpaces || 0)}</strong></div>
+              <div><span>House-Wash Sides</span><strong>${escapeHtml((lead.houseWashSides || []).join(", ") || "None")}</strong></div>
+            </div>
+          </section>
+
+          <section>
+            <h3>Complete Submitted Quote</h3>
+            <div class="quote-table-wrap">
+              <table class="quote-table">
+                <thead><tr><th>Service / Area</th><th>Calculation</th><th>Price</th></tr></thead>
+                <tbody>${lineItemsHtml}</tbody>
+              </table>
+            </div>
+
+            <div class="totals">
+              <div><span>Subtotal</span><strong>${moneyDisplay(quote.subtotal)}</strong></div>
+              <div><span>Bundle Discount</span><strong>${Math.round(Number(quote.discountRate || 0) * 100)}%</strong></div>
+              <div><span>Savings</span><strong>${moneyDisplay(quote.savings)}</strong></div>
+              <div class="grand-total"><span>Estimated Total</span><strong>${moneyDisplay(quote.total)}</strong></div>
+            </div>
+          </section>
+
+          ${lead.estimateText ? `
+          <section>
+            <h3>Text Copy of Submitted Estimate</h3>
+            <pre>${escapeHtml(lead.estimateText)}</pre>
+          </section>` : ""}
+        </div>
+      </details>
     `;
   }).join("");
 
   res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
       <head>
-        <title>EPM Leads</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>EPM Lead Dashboard</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 24px; background: #f4f8f3; color: #061b33; }
-          h1 { margin-top: 0; }
-          table { width: 100%; border-collapse: collapse; background: white; }
-          th, td { padding: 10px; border: 1px solid #d7e4d2; font-size: 14px; text-align: left; vertical-align: top; }
-          th { background: #061b33; color: white; }
+          *{box-sizing:border-box}
+          body{font-family:Arial,sans-serif;margin:0;padding:24px;background:#eef4ec;color:#061b33}
+          .page{max-width:1200px;margin:auto}
+          .topbar{background:linear-gradient(135deg,#061b33,#123a63);color:white;border-radius:18px;padding:24px;margin-bottom:18px}
+          .topbar h1{margin:0 0 6px}
+          .topbar p{margin:0;color:#d9ead8}
+          .lead-card{background:white;border:1px solid #cfddca;border-radius:16px;margin:14px 0;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+          summary{cursor:pointer;display:flex;justify-content:space-between;gap:16px;align-items:center;padding:18px;list-style:none}
+          summary::-webkit-details-marker{display:none}
+          summary h2{margin:7px 0 4px;font-size:20px}
+          summary p{margin:0;color:#64748b}
+          .summary-right{text-align:right;display:grid;gap:5px}
+          .summary-right strong{font-size:24px;color:#2f7d20}
+          .summary-right span{font-size:12px;color:#64748b}
+          .status-pill{display:inline-block;background:#eaf5e6;color:#256818;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:bold}
+          .lead-body{padding:0 18px 20px;border-top:1px solid #e2e8f0}
+          section{padding-top:18px}
+          section h3{margin:0 0 11px}
+          .facts{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+          .facts div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:11px;padding:11px}
+          .facts span{display:block;color:#64748b;font-size:11px;margin-bottom:4px}
+          .facts strong{font-size:14px}
+          a{color:#2f7d20}
+          .notes{margin-top:10px;padding:12px;border-left:4px solid #2f7d20;background:#f7fbf5}
+          .notes p{margin:6px 0 0}
+          .two-column{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+          .two-column>div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px}
+          ul{margin:0;padding-left:20px}
+          li{margin:5px 0}
+          .image-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+          .image-grid div{border:1px solid #d7e4d2;border-radius:12px;overflow:hidden}
+          .image-grid span{display:block;background:#061b33;color:white;padding:8px 10px;font-weight:bold;font-size:12px}
+          .image-grid img{width:100%;display:block;aspect-ratio:1/1;object-fit:cover}
+          .quote-table-wrap{overflow:auto}
+          .quote-table{width:100%;border-collapse:collapse;background:white}
+          .quote-table th,.quote-table td{border:1px solid #e2e8f0;padding:9px;text-align:left;font-size:13px}
+          .quote-table th{background:#061b33;color:white}
+          .quote-table .service-row td{background:#f4f8f3}
+          .quote-table .indent{padding-left:25px}
+          .quote-table .amount{text-align:right;white-space:nowrap}
+          .totals{margin-left:auto;margin-top:12px;max-width:420px}
+          .totals div{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #e2e8f0}
+          .totals .grand-total{font-size:19px;border-top:2px solid #2f7d20;border-bottom:0}
+          .totals .grand-total strong{color:#2f7d20;font-size:24px}
+          pre{white-space:pre-wrap;background:#071a2f;color:#e5f4e1;padding:15px;border-radius:12px;overflow:auto;font-size:12px}
+          .empty{background:white;border-radius:14px;padding:24px;text-align:center}
+          @media(max-width:800px){
+            body{padding:12px}
+            summary{align-items:flex-start}
+            .facts{grid-template-columns:1fr 1fr}
+            .two-column,.image-grid{grid-template-columns:1fr}
+          }
+          @media(max-width:480px){
+            .facts{grid-template-columns:1fr}
+            summary{display:block}
+            .summary-right{text-align:left;margin-top:10px}
+          }
         </style>
       </head>
       <body>
-        <h1>EPM Website Leads</h1>
-        <p>Total leads: ${leads.length}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Email</th>
-              <th>Property</th>
-              <th>Estimate</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        <div class="page">
+          <div class="topbar">
+            <h1>EPM Lead Dashboard</h1>
+            <p>${leads.length} saved lead${leads.length === 1 ? "" : "s"} · complete submitted quotes and property details</p>
+          </div>
+          ${cards || '<div class="empty"><h2>No leads yet</h2><p>Submitted final-quote requests will appear here.</p></div>'}
+        </div>
       </body>
     </html>
   `);
 });
 
+
 app.get("/api/leads", (req, res) => {
+  if (!leadMatchesAdminKey(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
   res.json({ leads: readLeads() });
 });
 
 app.post("/api/leads", async (req, res) => {
   try {
+    const body = req.body || {};
     const lead = {
       id: "lead_" + Date.now(),
       createdAt: new Date().toISOString(),
-      ...req.body
+      customer: body.customer || {},
+      property: body.property || {},
+      images: body.images || {},
+      metrics: body.metrics || {},
+      quote: body.quote || body.quoteSnapshot || {},
+      quoteSnapshot: body.quoteSnapshot || body.quote || {},
+      windowPanes: body.windowPanes || 0,
+      selectedServices: body.selectedServices || [],
+      serviceFrequencies: body.serviceFrequencies || [],
+      addOnQuantities: body.addOnQuantities || {},
+      houseWashSides: body.houseWashSides || [],
+      submittedAt: body.submittedAt || new Date().toISOString(),
+      estimateText: body.estimateText || "",
+      callbackOnly: Boolean(body.callbackOnly),
+      rawSubmission: body
     };
 
     saveLead(lead);
@@ -603,9 +925,14 @@ app.post("/api/estimate", async (req, res) => {
         street: `/api/property-image?type=street&lat=${property.lat}&lng=${property.lng}`
       },
       regridFound: Boolean(regridFeature),
+      measurementDebug: {
+        regridFound: Boolean(regridFeature),
+        parcelSource: regridFeature ? "Regrid parcel" : "No verified parcel",
+        fallbackUsed: false
+      },
       metrics,
       quote,
-      disclaimer: "This is a working AI estimate based on available imagery and property data. Final pricing is confirmed after EPM reviews the property."
+      disclaimer: "This is a working AI estimate based on verified parcel data, imagery, and property records. Final pricing is confirmed after EPM reviews the property."
     });
   } catch (error) {
     console.error(error);

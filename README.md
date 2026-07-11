@@ -1,39 +1,79 @@
-# EPM AI Estimator V5 - Free Lead Capture
+# EPM Backend V6 — Complete Lead Storage
 
-Upload these files to your GitHub repo and overwrite the old files:
+This backend update stores and displays the entire quote submission.
 
-- server.js
-- package.json
-- wix-widget.html
-- README.md
+## Replace these files in GitHub
 
-Render should redeploy automatically.
+- `server.js`
+- `package.json`
 
-## What changed
+Commit the changes. Render should redeploy automatically.
 
-V5 adds free lead capture.
+## Lead dashboard
 
-When the customer clicks **Get My Final Quote**, the widget sends the lead directly to your Render backend.
+Open:
 
-The backend:
-1. Saves the lead to `data/leads.json`
-2. Shows it at `/admin`
-3. Optionally emails you the lead if Gmail SMTP is configured
+`https://epm-ai-estimator.onrender.com/admin`
 
-## Free lead dashboard
+The dashboard now shows:
 
-After deploy, open:
+- Customer name, phone, email, and notes
+- Property address and metrics
+- Aerial and Street View images
+- Every selected service
+- Maintenance schedule selections
+- Bush, limb, and stain-treatment quantities
+- House-wash sides
+- Every itemized quote line
+- Subtotal, bundle discount, savings, and estimated total
+- Full text copy of the submitted estimate
 
-https://epm-ai-estimator.onrender.com/admin
+## Optional admin protection
 
-## Optional free email notification with Gmail
+In Render → Environment, add:
 
-In Render, add these environment variables:
+- Key: `ADMIN_KEY`
+- Value: any private password-like string you choose
 
-EMAIL_USER=yourgmail@gmail.com
-EMAIL_PASS=your_gmail_app_password
-LEAD_EMAIL_TO=yourgmail@gmail.com
+Then open the dashboard using:
 
-Important: EMAIL_PASS must be a Gmail App Password, not your normal Gmail password.
+`https://epm-ai-estimator.onrender.com/admin?key=YOUR_ADMIN_KEY`
 
-If you skip the email variables, leads still save to `/admin`.
+If `ADMIN_KEY` is not set, `/admin` remains publicly accessible.
+
+## Email environment variables
+
+Keep these in Render:
+
+- `EMAIL_USER`
+- `EMAIL_PASS`
+- `LEAD_EMAIL_TO`
+
+## Important storage note
+
+This version saves leads to `data/leads.json`. A normal Render web-service filesystem can be replaced during redeploys or restarts. Email notifications remain a separate copy of each lead. For durable long-term storage, connect a database or persistent disk later.
+
+
+## No-fallback measurement update
+
+This version removes the hardcoded 7,200 sq ft parcel fallback and the repeated ~4,600 sq ft lawn result.
+
+If Regrid does not return a usable parcel or building size, the API now returns an error instead of inventing measurements.
+
+### Upload instructions
+
+1. Extract this ZIP.
+2. In GitHub, replace `server.js` with the included file.
+3. Keep `package.json` unchanged unless GitHub asks you to replace it too.
+4. Commit the changes.
+5. Wait for Render to redeploy and show `Live`.
+6. Test several different properties.
+7. Check Render logs for:
+   - Regrid HTTP status
+   - Regrid feature count
+   - Parcel properties
+   - Geometry type
+
+### Required Render environment variable
+
+`REGRID_TOKEN` must contain your valid Regrid token.
