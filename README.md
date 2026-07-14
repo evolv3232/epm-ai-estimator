@@ -1,16 +1,11 @@
-# EPM Stable Measurements Update
+# EPM Proposal System V3
 
-Fixes:
-- Internal pricing formulas and rounding language are hidden from customers.
-- The same property measurements are reused when service selections change.
-- Lawn price no longer changes when another service is added.
-- Browser and backend measurement caching last 14 days.
-- Quote pricing still recalculates only from selected services.
+Updates included:
+- One-click buttons for all EPM services
+- Automatic professional descriptions
+- Live preview and total
+- Working Create & Save flow with error messages
+- Test Connection button
+- Copy, text, email, and open customer-link actions
 
-Deploy:
-1. Replace GitHub root `server.js` and `package.json`.
-2. Commit and redeploy Render.
-3. Replace Wix embed with `wix-widget.html`.
-
-Optional Render variable:
-`MEASUREMENT_CACHE_DAYS=14`
+Deploy backend/server.js and backend/package.json to GitHub/Render first. Verify https://epm-ai-estimator.onrender.com/api/proposals-health then paste EPM_Admin_Proposal_Generator_V3.html into the hidden Wix page.
